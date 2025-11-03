@@ -28,10 +28,8 @@ dotnet build
 {
   "targetExecutable": "C:\\Program Files\\YourApp\\YourApp.exe",
   "workingDirectory": "C:\\Program Files\\YourApp",
-  "versionCheckUrl": "https://example.com/version.txt",
-  "updateDownloadUrl": "https://example.com/update.zip",
-  "localVersionFile": "version.txt",
-  "targetDirectory": "C:\\Program Files\\YourApp"
+  "versionCheckUrl": "https://example.com/version.json",
+  "localVersionFile": "version.txt"
 }
 ```
 
@@ -39,52 +37,34 @@ dotnet build
 
 - **targetExecutable**: 실행할 대상 프로그램의 전체 경로
 - **workingDirectory**: 대상 프로그램의 작업 디렉토리 (선택사항)
-- **versionCheckUrl**: 버전 정보를 확인할 URL
-  - 텍스트 형식: `1.0.5`
-  - JSON 형식: `{"version": "1.0.5"}`
-- **updateDownloadUrl**: 업데이트 파일(ZIP)을 다운로드할 URL
+- **versionCheckUrl**: 버전 정보를 확인할 URL (JSON 형식)
 - **localVersionFile**: 로컬 버전 파일 경로
-- **targetDirectory**: 업데이트 파일을 압축 해제할 대상 디렉토리
 
 ## 서버 설정
 
-### 1. 버전 파일 (version.txt 또는 version.json)
+### 버전 JSON 파일 (version.json)
 
-**텍스트 형식 (version.txt):**
-```
-1.0.5
-```
+서버에 다음과 같은 형식의 JSON 파일을 호스팅합니다:
 
-**JSON 형식 (version.json):**
 ```json
 {
-  "version": "1.0.5"
+  "version": "1.0.5",
+  "downloadUrl": "https://example.com/YourApp-1.0.5.exe"
 }
 ```
 
-### 2. 업데이트 ZIP 파일
-
-업데이트할 파일들을 ZIP으로 압축합니다. ZIP 파일 내부 구조는 대상 디렉토리와 동일해야 합니다.
-
-예시:
-```
-update.zip
-├── YourApp.exe
-├── YourApp.dll
-├── config.json
-└── ...
-```
+- **version**: 최신 버전 번호
+- **downloadUrl**: 업데이트 EXE 파일의 다운로드 URL
 
 ## 동작 방식
 
 1. **시작**: 런처가 실행되면 시작프로그램에 자동 등록
 2. **트레이 아이콘 표시**: 시스템 트레이에 아이콘 표시 (UI 창 없음)
-3. **버전 체크**: 백그라운드에서 원격 서버의 최신 버전 확인
+3. **버전 체크**: 백그라운드에서 원격 서버의 최신 버전 확인 (JSON 파싱)
 4. **업데이트 판단**:
-   - 구버전: 자동 업데이트 진행
-   - 최신 버전: 바로 프로그램 실행
-5. **프로그램 실행**: 대상 프로그램 실행
-6. **런처 종료**: 대상 프로그램이 실행되면 5초 후 런처 자동 종료
+   - **구버전**: 서버에서 제공한 downloadUrl로 EXE 파일 다운로드 → 다운로드한 EXE 실행 → 런처 종료
+   - **최신 버전**: 설정된 대상 프로그램 실행 → 5초 후 런처 종료
+5. **자동 종료**: 프로그램이 실행되면 5초 후 런처 자동 종료
 
 ### 트레이 아이콘 기능
 
@@ -119,6 +99,8 @@ MIT License
 - 첫 실행 시 `launcher_config.json`이 자동 생성됩니다.
 - 설정 파일을 환경에 맞게 수정해야 합니다.
 - 업데이트 서버는 HTTPS를 권장합니다.
-- ZIP 파일 내부 구조가 올바른지 확인하세요.
+- 서버의 version.json에는 반드시 `version`과 `downloadUrl` 필드가 포함되어야 합니다.
+- 업데이트 파일은 EXE 형식으로 제공되며, 다운로드 후 자동으로 실행됩니다.
 - 트레이 아이콘은 Windows 기본 애플리케이션 아이콘을 사용합니다.
 - 런처는 백그라운드에서 실행되며 UI 창은 기본적으로 표시되지 않습니다.
+- 업데이트가 필요한 경우 다운로드한 EXE를 실행하고 런처가 종료됩니다.

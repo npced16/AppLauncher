@@ -32,25 +32,46 @@ namespace AppLauncher
 
                 await Task.Delay(500); // UI 표시를 위한 짧은 지연
 
-                // 2. 업데이트 필요 시 업데이트 실행
+                // 2. 업데이트 필요 시 EXE 다운로드 및 실행
                 if (versionResult.IsUpdateRequired)
                 {
-                    _window.UpdateStatus($"새 버전 발견: {versionResult.RemoteVersion}");
+                    _window!.UpdateStatus($"새 버전 발견: {versionResult.RemoteVersion}");
                     await Task.Delay(1000);
 
-                    var updater = new Updater(
-                        config.UpdateDownloadUrl,
-                        config.TargetDirectory,
-                        config.LocalVersionFile,
-                        _window
-                    );
-
-                    bool updateSuccess = await updater.UpdateAsync(versionResult.RemoteVersion);
-
-                    if (!updateSuccess)
+                    if (string.IsNullOrEmpty(versionResult.DownloadUrl))
                     {
-                        _window.UpdateStatus("업데이트 실패. 기존 버전으로 실행합니다.", isError: true);
+                        _window.UpdateStatus("다운로드 URL이 없습니다.", isError: true);
                         await Task.Delay(2000);
+                    }
+                    else
+                    {
+                        // ZIP이 아닌 EXE를 다운로드하고 실행
+                        _window.UpdateStatus("업데이트 파일 다운로드 중...");
+                        _window.UpdateProgress(30);
+
+                        var updater = new BackgroundUpdater(
+                            versionResult.DownloadUrl,
+                            config.LocalVersionFile,
+                            (status) => _window.UpdateStatus(status)
+                        );
+
+                        string? exePath = await updater.DownloadAndGetExePathAsync(versionResult.RemoteVersion);
+
+                        if (exePath != null)
+                        {
+                            _window.UpdateStatus("업데이트 프로그램 실행 중...");
+                            _window.UpdateProgress(80);
+                            LaunchTargetApplication(exePath, config.WorkingDirectory);
+                            _window.UpdateProgress(100);
+                            await Task.Delay(1000);
+                            Application.Current.Shutdown();
+                            return;
+                        }
+                        else
+                        {
+                            _window.UpdateStatus("다운로드 실패. 기존 버전으로 실행합니다.", isError: true);
+                            await Task.Delay(2000);
+                        }
                     }
                 }
                 else
