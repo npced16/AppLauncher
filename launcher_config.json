@@ -1,0 +1,8 @@
+{
+  "targetExecutable": "C:\\Program Files\\YourApp\\YourApp.exe",
+  "workingDirectory": "C:\\Program Files\\YourApp",
+  "versionCheckUrl": "https://example.com/version.txt",
+  "updateDownloadUrl": "https://example.com/update.zip",
+  "localVersionFile": "version.txt",
+  "targetDirectory": "C:\\Program Files\\YourApp"
+}
