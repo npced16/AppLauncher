@@ -25,29 +25,31 @@ namespace AppLauncher
                 var localVersion = GetLocalVersion();
 
                 // 원격 버전 확인
-                var remoteVersion = await GetRemoteVersionAsync();
+                var remoteInfo = await GetRemoteVersionInfoAsync();
 
-                if (remoteVersion == null)
+                if (remoteInfo == null)
                 {
                     return new VersionCheckResult
                     {
                         IsUpdateRequired = false,
                         LocalVersion = localVersion,
                         RemoteVersion = localVersion,
+                        DownloadUrl = null,
                         Message = "원격 버전 정보를 가져올 수 없습니다. 로컬 버전으로 실행합니다."
                     };
                 }
 
                 // 버전 비교
-                bool isUpdateRequired = CompareVersions(localVersion, remoteVersion) < 0;
+                bool isUpdateRequired = CompareVersions(localVersion, remoteInfo.Version) < 0;
 
                 return new VersionCheckResult
                 {
                     IsUpdateRequired = isUpdateRequired,
                     LocalVersion = localVersion,
-                    RemoteVersion = remoteVersion,
+                    RemoteVersion = remoteInfo.Version,
+                    DownloadUrl = remoteInfo.DownloadUrl,
                     Message = isUpdateRequired
-                        ? $"새 버전({remoteVersion})이 있습니다. 업데이트를 진행합니다."
+                        ? $"새 버전({remoteInfo.Version})이 있습니다. 업데이트를 진행합니다."
                         : "최신 버전입니다."
                 };
             }
@@ -58,6 +60,7 @@ namespace AppLauncher
                     IsUpdateRequired = false,
                     LocalVersion = "0.0.0",
                     RemoteVersion = "0.0.0",
+                    DownloadUrl = null,
                     Message = $"버전 확인 중 오류: {ex.Message}"
                 };
             }
@@ -77,7 +80,7 @@ namespace AppLauncher
             return "0.0.0";
         }
 
-        private async Task<string?> GetRemoteVersionAsync()
+        private async Task<RemoteVersionInfo?> GetRemoteVersionInfoAsync()
         {
             try
             {
@@ -86,15 +89,19 @@ namespace AppLauncher
 
                 var response = await client.GetStringAsync(_versionUrl);
 
-                // JSON 형식인 경우
-                if (_versionUrl.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
-                {
-                    var json = JObject.Parse(response);
-                    return json["version"]?.ToString();
-                }
+                // JSON 형식으로 파싱
+                var json = JObject.Parse(response);
+                var version = json["version"]?.ToString();
+                var downloadUrl = json["downloadUrl"]?.ToString();
 
-                // 텍스트 형식인 경우
-                return response.Trim();
+                if (string.IsNullOrEmpty(version))
+                    return null;
+
+                return new RemoteVersionInfo
+                {
+                    Version = version,
+                    DownloadUrl = downloadUrl
+                };
             }
             catch
             {
@@ -117,11 +124,18 @@ namespace AppLauncher
         }
     }
 
+    public class RemoteVersionInfo
+    {
+        public string Version { get; set; } = "";
+        public string? DownloadUrl { get; set; }
+    }
+
     public class VersionCheckResult
     {
         public bool IsUpdateRequired { get; set; }
         public string LocalVersion { get; set; } = "0.0.0";
         public string RemoteVersion { get; set; } = "0.0.0";
+        public string? DownloadUrl { get; set; }
         public string Message { get; set; } = "";
     }
 }

@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using Microsoft.Win32;
 
@@ -5,12 +6,23 @@ namespace AppLauncher
 {
     public partial class App : Application
     {
+        private TrayApplicationContext? _trayContext;
+
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
 
             // 시작프로그램 등록 (첫 실행시)
             RegisterStartup();
+
+            // 트레이 앱 시작 (UI 창 숨김)
+            _trayContext = new TrayApplicationContext();
+        }
+
+        protected override void OnExit(ExitEventArgs e)
+        {
+            _trayContext?.Dispose();
+            base.OnExit(e);
         }
 
         private void RegisterStartup()

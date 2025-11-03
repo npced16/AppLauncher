@@ -53,10 +53,8 @@ namespace AppLauncher
             {
                 TargetExecutable = @"C:\Program Files\YourApp\YourApp.exe",
                 WorkingDirectory = @"C:\Program Files\YourApp",
-                VersionCheckUrl = "https://example.com/version.txt",
-                UpdateDownloadUrl = "https://example.com/update.zip",
-                LocalVersionFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "version.txt"),
-                TargetDirectory = @"C:\Program Files\YourApp"
+                VersionCheckUrl = "https://example.com/version.json",
+                LocalVersionFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "version.txt")
             };
         }
     }
@@ -76,29 +74,17 @@ namespace AppLauncher
         public string? WorkingDirectory { get; set; }
 
         /// <summary>
-        /// 버전 정보를 확인할 URL (텍스트 또는 JSON 형식)
-        /// 예: https://example.com/version.txt (내용: "1.0.5")
-        /// 또는: https://example.com/version.json (내용: {"version": "1.0.5"})
+        /// 버전 정보를 확인할 URL (JSON 형식)
+        /// 예: https://example.com/version.json
+        /// 내용: {"version": "1.0.5", "downloadUrl": "https://example.com/YourApp-1.0.5.exe"}
         /// </summary>
         [JsonProperty("versionCheckUrl")]
         public string VersionCheckUrl { get; set; } = "";
-
-        /// <summary>
-        /// 업데이트 파일(ZIP)을 다운로드할 URL
-        /// </summary>
-        [JsonProperty("updateDownloadUrl")]
-        public string UpdateDownloadUrl { get; set; } = "";
 
         /// <summary>
         /// 로컬 버전 파일 경로
         /// </summary>
         [JsonProperty("localVersionFile")]
         public string LocalVersionFile { get; set; } = "";
-
-        /// <summary>
-        /// 업데이트 파일을 압축 해제할 대상 디렉토리
-        /// </summary>
-        [JsonProperty("targetDirectory")]
-        public string TargetDirectory { get; set; } = "";
     }
 }

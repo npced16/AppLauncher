@@ -8,9 +8,9 @@ namespace AppLauncher
 {
     public class ApplicationLauncher
     {
-        private readonly MainWindow _window;
+        private readonly MainWindow? _window;
 
-        public ApplicationLauncher(MainWindow window)
+        public ApplicationLauncher(MainWindow? window)
         {
             _window = window;
         }
@@ -91,13 +91,108 @@ namespace AppLauncher
             }
         }
 
+        public async Task CheckAndLaunchInBackgroundAsync(LauncherConfig config, Action<string> statusCallback)
+        {
+            try
+            {
+                // 1. 버전 체크
+                statusCallback("버전 확인 중...");
+
+                var versionChecker = new VersionChecker(
+                    config.VersionCheckUrl,
+                    config.LocalVersionFile
+                );
+
+                var versionResult = await versionChecker.CheckVersionAsync();
+
+                // 2. 업데이트 필요 시 EXE 다운로드 및 실행
+                if (versionResult.IsUpdateRequired)
+                {
+                    statusCallback($"새 버전 발견: {versionResult.RemoteVersion}");
+                    await Task.Delay(1000);
+
+                    if (string.IsNullOrEmpty(versionResult.DownloadUrl))
+                    {
+                        statusCallback("다운로드 URL이 없습니다. 기존 버전으로 실행합니다.");
+                        await Task.Delay(2000);
+
+                        // 기존 프로그램 실행
+                        LaunchTargetApplication(config.TargetExecutable, config.WorkingDirectory, statusCallback);
+                        return;
+                    }
+
+                    var updater = new BackgroundUpdater(
+                        versionResult.DownloadUrl,
+                        config.LocalVersionFile,
+                        statusCallback
+                    );
+
+                    string? exePath = await updater.DownloadAndGetExePathAsync(versionResult.RemoteVersion);
+
+                    if (exePath == null)
+                    {
+                        statusCallback("다운로드 실패. 기존 버전으로 실행합니다.");
+                        await Task.Delay(2000);
+
+                        // 기존 프로그램 실행
+                        LaunchTargetApplication(config.TargetExecutable, config.WorkingDirectory, statusCallback);
+                        return;
+                    }
+
+                    // 다운로드한 EXE 실행
+                    statusCallback("업데이트 프로그램 실행 중...");
+                    await Task.Delay(500);
+
+                    bool launchSuccess = LaunchExecutable(exePath, config.WorkingDirectory, statusCallback);
+
+                    if (launchSuccess)
+                    {
+                        statusCallback("업데이트 프로그램 실행 완료!");
+                        await Task.Delay(1000);
+                    }
+                    else
+                    {
+                        statusCallback("업데이트 프로그램 실행 실패");
+                        await Task.Delay(3000);
+                    }
+                }
+                else
+                {
+                    statusCallback(versionResult.Message);
+                    await Task.Delay(500);
+
+                    // 3. 최신 버전이면 대상 프로그램 실행
+                    statusCallback("프로그램 실행 중...");
+                    await Task.Delay(500);
+
+                    bool launchSuccess = LaunchTargetApplication(config.TargetExecutable, config.WorkingDirectory, statusCallback);
+
+                    if (launchSuccess)
+                    {
+                        statusCallback("프로그램 실행 완료!");
+                        await Task.Delay(1000);
+                    }
+                    else
+                    {
+                        statusCallback("프로그램 실행 실패");
+                        await Task.Delay(3000);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                statusCallback($"오류 발생: {ex.Message}");
+                await Task.Delay(3000);
+            }
+        }
+
         private bool LaunchTargetApplication(string executable, string? workingDirectory)
         {
             try
             {
                 if (!File.Exists(executable))
                 {
-                    _window.UpdateStatus($"실행 파일을 찾을 수 없습니다: {executable}", isError: true);
+                    _window?.UpdateStatus($"실행 파일을 찾을 수 없습니다: {executable}", isError: true);
                     return false;
                 }
 
@@ -117,7 +212,43 @@ namespace AppLauncher
             }
             catch (Exception ex)
             {
-                _window.UpdateStatus($"실행 오류: {ex.Message}", isError: true);
+                _window?.UpdateStatus($"실행 오류: {ex.Message}", isError: true);
+                return false;
+            }
+        }
+
+        private bool LaunchTargetApplication(string executable, string? workingDirectory, Action<string> statusCallback)
+        {
+            return LaunchExecutable(executable, workingDirectory, statusCallback);
+        }
+
+        private bool LaunchExecutable(string executable, string? workingDirectory, Action<string> statusCallback)
+        {
+            try
+            {
+                if (!File.Exists(executable))
+                {
+                    statusCallback($"실행 파일을 찾을 수 없습니다: {executable}");
+                    return false;
+                }
+
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = executable,
+                    UseShellExecute = true
+                };
+
+                if (!string.IsNullOrWhiteSpace(workingDirectory) && Directory.Exists(workingDirectory))
+                {
+                    startInfo.WorkingDirectory = workingDirectory;
+                }
+
+                Process.Start(startInfo);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                statusCallback($"실행 오류: {ex.Message}");
                 return false;
             }
         }
