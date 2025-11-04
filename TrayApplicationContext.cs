@@ -19,9 +19,32 @@ namespace AppLauncher
 
         private void InitializeTrayIcon()
         {
+            // 아이콘 파일 로드
+            Icon? appIcon = null;
+            string iconPath = System.IO.Path.Combine(
+                AppDomain.CurrentDomain.BaseDirectory,
+                "app_icon.ico"
+            );
+
+            if (System.IO.File.Exists(iconPath))
+            {
+                try
+                {
+                    appIcon = new Icon(iconPath);
+                }
+                catch
+                {
+                    appIcon = SystemIcons.Application;
+                }
+            }
+            else
+            {
+                appIcon = SystemIcons.Application;
+            }
+
             _notifyIcon = new NotifyIcon
             {
-                Icon = SystemIcons.Application, // 기본 아이콘 사용
+                Icon = appIcon,
                 Visible = true,
                 Text = "App Launcher"
             };
@@ -32,6 +55,12 @@ namespace AppLauncher
             var showMenuItem = new ToolStripMenuItem("상태 보기");
             showMenuItem.Click += ShowWindow;
             contextMenu.Items.Add(showMenuItem);
+
+            contextMenu.Items.Add(new ToolStripSeparator());
+
+            var unregisterMenuItem = new ToolStripMenuItem("시작프로그램 등록 해제");
+            unregisterMenuItem.Click += UnregisterFromStartup;
+            contextMenu.Items.Add(unregisterMenuItem);
 
             contextMenu.Items.Add(new ToolStripSeparator());
 
@@ -97,6 +126,37 @@ namespace AppLauncher
             else
             {
                 _mainWindow.Activate();
+            }
+        }
+
+        private void UnregisterFromStartup(object? sender, EventArgs e)
+        {
+            var result = System.Windows.MessageBox.Show(
+                "시작프로그램 등록을 해제하시겠습니까?",
+                "등록 해제",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                bool success = TaskSchedulerManager.UnregisterTask();
+
+                if (success)
+                {
+                    System.Windows.MessageBox.Show(
+                        "시작프로그램 등록이 해제되었습니다.",
+                        "완료",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+                else
+                {
+                    System.Windows.MessageBox.Show(
+                        "등록 해제에 실패했습니다.\n관리자 권한으로 실행해주세요.",
+                        "실패",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                }
             }
         }
 

@@ -12,10 +12,26 @@ namespace AppLauncher
         {
             base.OnStartup(e);
 
-            // 시작프로그램 등록 (첫 실행시)
-            RegisterStartup();
+            // 작업 스케줄러에 등록되어 있는지 확인
+            if (!TaskSchedulerManager.IsTaskRegistered())
+            {
+                // 등록되어 있지 않으면 등록 시도
+                string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location.Replace(".dll", ".exe");
+                bool registered = TaskSchedulerManager.RegisterTask(exePath);
 
-            // 트레이 앱 시작 (UI 창 숨김)
+                if (registered)
+                {
+                    MessageBox.Show("시작 프로그램에 등록되었습니다.\n다음 로그인부터 자동으로 실행됩니다.",
+                        "등록 완료", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    MessageBox.Show("시작 프로그램 등록에 실패했습니다.\n관리자 권한으로 실행해주세요.",
+                        "등록 실패", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+
+            // 트레이 앱 시작 (manifest에서 관리자 권한 요구)
             _trayContext = new TrayApplicationContext();
         }
 
@@ -23,34 +39,6 @@ namespace AppLauncher
         {
             _trayContext?.Dispose();
             base.OnExit(e);
-        }
-
-        private void RegisterStartup()
-        {
-            try
-            {
-                string appName = "AppLauncher";
-                string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location.Replace(".dll", ".exe");
-
-                using (RegistryKey? key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
-                {
-                    if (key != null)
-                    {
-                        var currentValue = key.GetValue(appName) as string;
-
-                        // 이미 등록되어 있고 경로가 같으면 스킵
-                        if (currentValue == exePath)
-                            return;
-
-                        // 등록 또는 업데이트
-                        key.SetValue(appName, exePath);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"시작프로그램 등록 실패: {ex.Message}", "경고", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
         }
 
         public static void UnregisterStartup()

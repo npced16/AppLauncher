@@ -74,10 +74,22 @@ namespace AppLauncher
                 {
                     return File.ReadAllText(_localVersionFile).Trim();
                 }
+                else
+                {
+                    // 버전 파일이 없으면 자동 생성 (1.0.0으로 초기화)
+                    string? directory = Path.GetDirectoryName(_localVersionFile);
+                    if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                    {
+                        Directory.CreateDirectory(directory);
+                    }
+
+                    File.WriteAllText(_localVersionFile, "1.0.0");
+                    return "1.0.0";
+                }
             }
             catch { }
 
-            return "0.0.0";
+            return "1.0.0";
         }
 
         private async Task<RemoteVersionInfo?> GetRemoteVersionInfoAsync()
