@@ -1,8 +1,10 @@
 using System;
 using System.Windows;
 using Microsoft.Win32;
+using AppLauncher.Features.TrayApp;
+using AppLauncher.Shared;
 
-namespace AppLauncher
+namespace AppLauncher.Presentation.WPF
 {
     public partial class App : Application
     {

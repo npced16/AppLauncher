@@ -4,7 +4,8 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 
-namespace AppLauncher
+using AppLauncher.Shared.Configuration;
+namespace AppLauncher.Features.VersionManagement
 {
     public class VersionChecker
     {

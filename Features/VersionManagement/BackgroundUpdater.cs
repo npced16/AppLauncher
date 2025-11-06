@@ -4,7 +4,8 @@ using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
 
-namespace AppLauncher
+using AppLauncher.Shared.Configuration;
+namespace AppLauncher.Features.VersionManagement
 {
     public class BackgroundUpdater
     {

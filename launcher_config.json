@@ -1,6 +1,14 @@
 {
-  "targetExecutable": "C:\\Program Files\\YourApp\\YourApp.exe",
-  "workingDirectory": "C:\\Program Files\\YourApp",
-  "versionCheckUrl": "https://example.com/version.json",
-  "localVersionFile": "version.txt"
+  "targetExecutable": "C:\\Windows\\System32\\notepad.exe",
+  "workingDirectory": "",
+  "versionCheckUrl": "",
+  "localVersionFile": "version.txt",
+  "mqttSettings": {
+    "broker": "localhost",
+    "port": 1883,
+    "clientId": "AppLauncher",
+    "topic": "applauncher/commands",
+    "username": "",
+    "password": ""
+  }
 }

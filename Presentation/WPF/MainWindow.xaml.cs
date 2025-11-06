@@ -1,8 +1,10 @@
 using System;
 using System.Threading.Tasks;
 using System.Windows;
+using AppLauncher.Shared.Configuration;
+using AppLauncher.Features.AppLaunching;
 
-namespace AppLauncher
+namespace AppLauncher.Presentation.WPF
 {
     public partial class MainWindow : Window
     {

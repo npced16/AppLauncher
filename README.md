@@ -1,15 +1,15 @@
 # App Launcher
 
-자동 업데이트 기능이 있는 C# WPF 트레이 런처 애플리케이션입니다.
+MQTT 기반 원격 제어가 가능한 C# WPF 트레이 런처 애플리케이션입니다.
 
 ## 주요 기능
 
 - **트레이 앱 방식**: 시스템 트레이에서 백그라운드로 실행 (UI 없음)
-- **자동 버전 체크**: 시작 시 원격 서버에서 최신 버전 확인
-- **자동 업데이트**: 구버전 감지 시 자동으로 업데이트 진행
+- **MQTT 원격 제어**: MQTT 메시지를 통한 원격 프로그램 실행 및 제어
+- **자동 버전 체크**: 시작 시 원격 서버에서 최신 버전 확인 (선택사항)
+- **자동 업데이트**: 구버전 감지 시 자동으로 업데이트 진행 (선택사항)
 - **작업 스케줄러 등록**: Windows 로그온 시 관리자 권한으로 자동 실행 (UAC 프롬프트 없음)
 - **상태 확인**: 트레이 아이콘 우클릭 또는 더블클릭으로 상태 창 표시
-- **자동 종료**: 대상 프로그램 실행 후 런처 자동 종료
 - **커스텀 아이콘**: 로켓 모양의 커스텀 아이콘 적용
 
 ## 빌드 방법
@@ -39,22 +39,135 @@ dotnet build --configuration Release
   "targetExecutable": "C:\\Program Files\\YourApp\\YourApp.exe",
   "workingDirectory": "C:\\Program Files\\YourApp",
   "versionCheckUrl": "https://example.com/version.json",
-  "localVersionFile": "version.txt"
+  "localVersionFile": "version.txt",
+  "mqttSettings": {
+    "broker": "mqtt.example.com",
+    "port": 1883,
+    "clientId": "AppLauncher",
+    "topic": "applauncher/commands",
+    "username": "your_username",
+    "password": "your_password"
+  }
 }
 ```
 
 ### 설정 항목 설명
 
+#### 기본 설정
 - **targetExecutable**: 실행할 대상 프로그램의 전체 경로
 - **workingDirectory**: 대상 프로그램의 작업 디렉토리 (선택사항)
-- **versionCheckUrl**: 버전 정보를 확인할 URL (JSON 형식)
+- **versionCheckUrl**: 버전 정보를 확인할 URL (JSON 형식, 선택사항)
 - **localVersionFile**: 로컬 버전 파일 경로 (없으면 자동 생성됨, 기본값: 1.0.0)
+
+#### MQTT 설정 (선택사항)
+- **broker**: MQTT 브로커 주소 (예: mqtt.example.com 또는 localhost)
+- **port**: MQTT 브로커 포트 (기본값: 1883)
+- **clientId**: MQTT 클라이언트 ID (기본값: AppLauncher)
+- **topic**: 명령을 수신할 MQTT 토픽 (기본값: applauncher/commands)
+- **username**: MQTT 인증 사용자명 (선택사항)
+- **password**: MQTT 인증 비밀번호 (선택사항)
+
+## MQTT 원격 제어
+
+### MQTT 명령 형식
+
+MQTT를 통해 프로그램을 원격으로 실행하려면 다음 형식의 JSON 메시지를 발행합니다:
+
+#### 프로그램 실행 명령
+
+**방법 1: 다운로드 URL 사용 (권장)**
+```json
+{
+  "command": "launch",
+  "downloadUrl": "https://example.com/YourApp.exe",
+  "workingDirectory": "C:\\temp",
+  "arguments": "--arg1 value1"
+}
+```
+
+**방법 2: 로컬 실행 파일 경로 사용**
+```json
+{
+  "command": "launch",
+  "executable": "C:\\Program Files\\YourApp\\YourApp.exe",
+  "workingDirectory": "C:\\Program Files\\YourApp",
+  "arguments": "--arg1 value1"
+}
+```
+
+**방법 3: 기본 설정 파일 사용**
+```json
+{
+  "command": "start"
+}
+```
+(설정 파일의 `targetExecutable`을 실행)
+
+#### 상태 확인 명령
+```json
+{
+  "command": "status"
+}
+```
+
+### MQTT 명령 필드 설명
+
+- **command**: 명령 종류 (`launch`, `start`, `status`)
+- **downloadUrl**: 다운로드할 EXE 파일 URL (우선순위 1)
+- **executable**: 실행할 로컬 프로그램 경로 (우선순위 2)
+- **workingDirectory**: 작업 디렉토리 (선택사항)
+- **arguments**: 실행 인자 (선택사항)
+
+**실행 우선순위:**
+1. `downloadUrl`이 있으면: 파일 다운로드 후 실행
+2. `executable`이 있으면: 해당 경로의 파일 실행
+3. 둘 다 없으면: 설정 파일의 `targetExecutable` 실행
+
+### MQTT 명령 예제 (Python)
+
+#### 다운로드 URL로 실행
+```python
+import paho.mqtt.client as mqtt
+import json
+
+# MQTT 클라이언트 생성
+client = mqtt.Client()
+client.username_pw_set("your_username", "your_password")
+client.connect("mqtt.example.com", 1883)
+
+# 다운로드 URL로 프로그램 실행
+command = {
+    "command": "launch",
+    "downloadUrl": "https://example.com/MyApp.exe"
+}
+client.publish("applauncher/commands", json.dumps(command))
+client.disconnect()
+```
+
+#### 로컬 파일로 실행
+```python
+import paho.mqtt.client as mqtt
+import json
+
+# MQTT 클라이언트 생성
+client = mqtt.Client()
+client.username_pw_set("your_username", "your_password")
+client.connect("mqtt.example.com", 1883)
+
+# 로컬 파일 실행
+command = {
+    "command": "launch",
+    "executable": "C:\\Windows\\System32\\notepad.exe"
+}
+client.publish("applauncher/commands", json.dumps(command))
+client.disconnect()
+```
 
 ## 서버 설정
 
-### 버전 JSON 파일 (version.json)
+### 버전 JSON 파일 (version.json) - 선택사항
 
-서버에 다음과 같은 형식의 JSON 파일을 호스팅합니다:
+자동 업데이트를 사용하려면 서버에 다음과 같은 형식의 JSON 파일을 호스팅합니다:
 
 ```json
 {
@@ -83,21 +196,13 @@ dotnet build --configuration Release
    - 시스템 트레이에 로켓 아이콘 표시
    - UI 창은 표시되지 않음 (백그라운드 실행)
 
-4. **버전 체크 및 업데이트**
-   - 백그라운드에서 원격 서버의 `version.json` 확인
-   - 로컬 버전 파일(`version.txt`)이 없으면 자동 생성 (1.0.0)
-   - 버전 비교 수행
+4. **MQTT 서비스 시작 (설정된 경우)**
+   - `launcher_config.json`에 `mqttSettings`가 있으면 MQTT 브로커에 연결
+   - 설정된 토픽을 구독하여 원격 명령 대기
 
-5. **업데이트 판단 및 실행**
-   - **업데이트 필요 시 (원격 버전 > 로컬 버전)**:
-     1. `downloadUrl`에서 EXE 파일 다운로드
-     2. 임시 폴더에 저장
-     3. 다운로드한 EXE 실행
-     4. 5초 후 런처 자동 종료
-
-   - **최신 버전인 경우**:
-     1. `launcher_config.json`의 `targetExecutable` 실행
-     2. 5초 후 런처 자동 종료
+5. **동작 모드**
+   - **MQTT 모드**: MQTT 메시지를 통해 프로그램 실행 (트레이에 상주)
+   - **레거시 모드**: 버전 체크 후 자동 실행 및 종료 (기존 방식)
 
 ### 이후 실행 (자동 시작)
 
@@ -107,10 +212,7 @@ dotnet build --configuration Release
 
 2. **백그라운드 실행**
    - 트레이 아이콘만 표시
-   - 자동으로 버전 체크 및 업데이트 진행
-
-3. **자동 종료**
-   - 대상 프로그램 실행 후 5초 뒤 자동 종료
+   - MQTT 메시지 수신 대기 또는 자동 업데이트 진행
 
 ### 트레이 아이콘 기능
 
@@ -167,34 +269,52 @@ AppLauncher.App.UnregisterStartup();
 - Windows 10/11
 - 관리자 권한 (첫 실행 시)
 
-## 프로젝트 구조
+## 프로젝트 구조 (Feature-based)
 
 ```
 AppLauncher/
-├── App.xaml.cs                  # 애플리케이션 시작 로직, 작업 스케줄러 등록
-├── TrayApplicationContext.cs    # 트레이 아이콘 및 메뉴 관리
-├── ApplicationLauncher.cs       # 메인 런처 로직 (버전 체크 → 업데이트 또는 실행)
-├── VersionChecker.cs            # 버전 비교 및 원격 JSON 파싱
-├── BackgroundUpdater.cs         # 업데이트 파일 다운로드
-├── ConfigManager.cs             # launcher_config.json 관리
-├── TaskSchedulerManager.cs      # Windows 작업 스케줄러 등록/해제
-├── MainWindow.xaml              # 상태 표시 UI (선택적)
-├── app.manifest                 # 관리자 권한 요구 설정
-├── app_icon.ico                 # 로켓 아이콘
-└── launcher_config.json         # 런처 설정 파일
+├── Features/                           # 기능별 모듈
+│   ├── AppLaunching/                   # 앱 실행 관리
+│   │   └── ApplicationLauncher.cs      # 프로그램 실행 로직
+│   ├── MqttControl/                    # MQTT 통신
+│   │   └── MqttService.cs              # MQTT pub/sub 서비스
+│   ├── TrayApp/                        # 트레이 앱
+│   │   └── TrayApplicationContext.cs   # 트레이 아이콘 및 메뉴
+│   └── VersionManagement/              # 버전 관리
+│       ├── VersionChecker.cs           # 버전 비교
+│       └── BackgroundUpdater.cs        # 파일 다운로드
+├── Presentation/                       # UI 레이어
+│   └── WPF/
+│       ├── App.xaml                    # WPF 애플리케이션
+│       ├── App.xaml.cs                 # 시작 로직, 작업 스케줄러 등록
+│       └── MainWindow.xaml             # 상태 표시 창
+├── Shared/                             # 공유 코드
+│   ├── Configuration/
+│   │   └── ConfigManager.cs            # 설정 관리
+│   └── TaskScheduler/
+│       └── TaskSchedulerManager.cs     # 작업 스케줄러
+├── app.manifest                        # 관리자 권한 설정
+├── app_icon.ico                        # 로켓 아이콘
+└── launcher_config.json                # 런처 설정
 ```
 
 ## 참고사항
 
 - 첫 실행 시 반드시 **관리자 권한**으로 실행해야 작업 스케줄러에 등록됩니다
 - `launcher_config.json`이 없으면 자동 생성되므로, 생성 후 수정해야 합니다
-- 로컬 버전 파일(`version.txt`)이 없으면 자동으로 `1.0.0`으로 생성됩니다
+- **MQTT 모드**: `mqttSettings`를 설정하면 트레이에 상주하며 MQTT 명령 대기
+- **레거시 모드**: MQTT 미설정 시 버전 체크 후 자동 실행 및 종료
+- MQTT를 통해 다운로드 URL을 받으면 자동으로 파일 다운로드 후 실행
+- 다운로드한 파일은 임시 폴더에 저장되며, 실행 후 자동 삭제되지 않음
 - 업데이트 서버는 HTTPS를 권장합니다
-- 서버의 `version.json`에는 반드시 `version`과 `downloadUrl` 필드가 포함되어야 합니다
-- 업데이트 파일은 EXE 형식으로 제공되며, 다운로드 후 자동으로 실행됩니다
 - 작업 스케줄러를 통해 등록되므로 UAC 프롬프트 없이 자동 시작됩니다
 - 런처는 백그라운드에서 실행되며 UI 창은 기본적으로 표시되지 않습니다
 - 트레이 아이콘 더블클릭 시 상태 창을 볼 수 있습니다
+
+## 사용된 라이브러리
+
+- **MQTTnet 5.0.1**: MQTT 클라이언트 라이브러리
+- **Newtonsoft.Json 13.0.3**: JSON 직렬화/역직렬화
 
 ## 라이선스
 

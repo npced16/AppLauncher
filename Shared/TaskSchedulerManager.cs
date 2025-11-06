@@ -1,7 +1,7 @@
 using System;
 using System.Diagnostics;
 
-namespace AppLauncher
+namespace AppLauncher.Shared
 {
     public class TaskSchedulerManager
     {

@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using Newtonsoft.Json;
 
-namespace AppLauncher
+namespace AppLauncher.Shared.Configuration
 {
     public class ConfigManager
     {
@@ -54,7 +54,16 @@ namespace AppLauncher
                 TargetExecutable = @"C:\Program Files\YourApp\YourApp.exe",
                 WorkingDirectory = @"C:\Program Files\YourApp",
                 VersionCheckUrl = "https://example.com/version.json",
-                LocalVersionFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "version.txt")
+                LocalVersionFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "version.txt"),
+                MqttSettings = new MqttSettings
+                {
+                    Broker = "localhost",
+                    Port = 1883,
+                    ClientId = "AppLauncher",
+                    Topic = "applauncher/commands",
+                    Username = "",
+                    Password = ""
+                }
             };
         }
     }
@@ -86,5 +95,50 @@ namespace AppLauncher
         /// </summary>
         [JsonProperty("localVersionFile")]
         public string LocalVersionFile { get; set; } = "";
+
+        /// <summary>
+        /// MQTT 연결 설정
+        /// </summary>
+        [JsonProperty("mqttSettings")]
+        public MqttSettings? MqttSettings { get; set; }
+    }
+
+    public class MqttSettings
+    {
+        /// <summary>
+        /// MQTT 브로커 주소
+        /// </summary>
+        [JsonProperty("broker")]
+        public string Broker { get; set; } = "localhost";
+
+        /// <summary>
+        /// MQTT 브로커 포트 (기본: 1883)
+        /// </summary>
+        [JsonProperty("port")]
+        public int Port { get; set; } = 1883;
+
+        /// <summary>
+        /// MQTT 클라이언트 ID
+        /// </summary>
+        [JsonProperty("clientId")]
+        public string ClientId { get; set; } = "AppLauncher";
+
+        /// <summary>
+        /// 구독할 MQTT 토픽
+        /// </summary>
+        [JsonProperty("topic")]
+        public string Topic { get; set; } = "applauncher/commands";
+
+        /// <summary>
+        /// MQTT 사용자 이름 (선택사항)
+        /// </summary>
+        [JsonProperty("username")]
+        public string? Username { get; set; }
+
+        /// <summary>
+        /// MQTT 비밀번호 (선택사항)
+        /// </summary>
+        [JsonProperty("password")]
+        public string? Password { get; set; }
     }
 }

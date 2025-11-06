@@ -3,8 +3,11 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
+using AppLauncher.Presentation.WPF;
+using AppLauncher.Shared.Configuration;
+using AppLauncher.Features.VersionManagement;
 
-namespace AppLauncher
+namespace AppLauncher.Features.AppLaunching
 {
     public class ApplicationLauncher
     {
@@ -64,7 +67,7 @@ namespace AppLauncher
                             LaunchTargetApplication(exePath, config.WorkingDirectory);
                             _window.UpdateProgress(100);
                             await Task.Delay(1000);
-                            Application.Current.Shutdown();
+                            // Application.Current.Shutdown();
                             return;
                         }
                         else
@@ -95,7 +98,7 @@ namespace AppLauncher
                     await Task.Delay(1000);
 
                     // 4. 런처 종료
-                    Application.Current.Shutdown();
+                    // Application.Current.Shutdown();
                 }
                 else
                 {
@@ -116,6 +119,17 @@ namespace AppLauncher
         {
             try
             {
+                // versionCheckUrl이 비어있으면 버전 체크 스킵
+                if (string.IsNullOrWhiteSpace(config.VersionCheckUrl))
+                {
+                    statusCallback("버전 체크 스킵 - 대상 프로그램 실행");
+                    await Task.Delay(500);
+
+                    // 대상 프로그램 바로 실행
+                    LaunchTargetApplication(config.TargetExecutable, config.WorkingDirectory, statusCallback);
+                    return;
+                }
+
                 // 1. 버전 체크
                 statusCallback("버전 확인 중...");
 
