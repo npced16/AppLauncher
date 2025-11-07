@@ -48,9 +48,9 @@ namespace AppLauncher.Features.AppLaunching
                     }
                     else
                     {
-                        // ZIP이 아닌 EXE를 다운로드하고 실행
-                        _window.UpdateStatus("업데이트 파일 다운로드 중...");
-                        _window.UpdateProgress(30);
+                        // 기존 파일을 새 버전으로 교체
+                        _window.UpdateStatus("업데이트 준비 중...");
+                        _window.UpdateProgress(20);
 
                         var updater = new BackgroundUpdater(
                             versionResult.DownloadUrl,
@@ -58,13 +58,19 @@ namespace AppLauncher.Features.AppLaunching
                             (status) => _window.UpdateStatus(status)
                         );
 
-                        string? exePath = await updater.DownloadAndGetExePathAsync(versionResult.RemoteVersion);
+                        _window.UpdateProgress(30);
 
-                        if (exePath != null)
+                        // 다운로드 후 원본 파일 교체
+                        string? updatedPath = await updater.DownloadAndReplaceExeAsync(
+                            versionResult.RemoteVersion,
+                            config.TargetExecutable
+                        );
+
+                        if (updatedPath != null)
                         {
-                            _window.UpdateStatus("업데이트 프로그램 실행 중...");
-                            _window.UpdateProgress(80);
-                            LaunchTargetApplication(exePath, config.WorkingDirectory);
+                            _window.UpdateStatus("업데이트된 프로그램 실행 중...");
+                            _window.UpdateProgress(90);
+                            LaunchTargetApplication(updatedPath, config.WorkingDirectory);
                             _window.UpdateProgress(100);
                             await Task.Delay(1000);
                             // Application.Current.Shutdown();
@@ -72,7 +78,7 @@ namespace AppLauncher.Features.AppLaunching
                         }
                         else
                         {
-                            _window.UpdateStatus("다운로드 실패. 기존 버전으로 실행합니다.", isError: true);
+                            _window.UpdateStatus("업데이트 실패. 기존 버전으로 실행합니다.", isError: true);
                             await Task.Delay(2000);
                         }
                     }
@@ -162,11 +168,15 @@ namespace AppLauncher.Features.AppLaunching
                         statusCallback
                     );
 
-                    string? exePath = await updater.DownloadAndGetExePathAsync(versionResult.RemoteVersion);
+                    // 다운로드 후 원본 파일 교체
+                    string? updatedPath = await updater.DownloadAndReplaceExeAsync(
+                        versionResult.RemoteVersion,
+                        config.TargetExecutable
+                    );
 
-                    if (exePath == null)
+                    if (updatedPath == null)
                     {
-                        statusCallback("다운로드 실패. 기존 버전으로 실행합니다.");
+                        statusCallback("업데이트 실패. 기존 버전으로 실행합니다.");
                         await Task.Delay(2000);
 
                         // 기존 프로그램 실행
@@ -174,20 +184,20 @@ namespace AppLauncher.Features.AppLaunching
                         return;
                     }
 
-                    // 다운로드한 EXE 실행
-                    statusCallback("업데이트 프로그램 실행 중...");
+                    // 업데이트된 프로그램 실행
+                    statusCallback("업데이트된 프로그램 실행 중...");
                     await Task.Delay(500);
 
-                    bool launchSuccess = LaunchExecutable(exePath, config.WorkingDirectory, statusCallback);
+                    bool launchSuccess = LaunchExecutable(updatedPath, config.WorkingDirectory, statusCallback);
 
                     if (launchSuccess)
                     {
-                        statusCallback("업데이트 프로그램 실행 완료!");
+                        statusCallback("프로그램 실행 완료!");
                         await Task.Delay(1000);
                     }
                     else
                     {
-                        statusCallback("업데이트 프로그램 실행 실패");
+                        statusCallback("프로그램 실행 실패");
                         await Task.Delay(3000);
                     }
                 }

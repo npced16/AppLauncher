@@ -54,7 +54,8 @@ namespace AppLauncher.Presentation.WPF
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
-            Application.Current.Shutdown();
+            // 창만 닫고 앱은 트레이에 유지
+            Close();
         }
     }
 }

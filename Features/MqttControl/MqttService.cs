@@ -29,7 +29,14 @@ namespace AppLauncher.Features.MqttControl
         /// </summary>
         public event Action<bool>? ConnectionStateChanged;
 
+        /// <summary>
+        /// 로그 메시지 이벤트
+        /// </summary>
+        public event Action<string>? LogMessage;
+
         public bool IsConnected => _isConnected;
+
+        public string LastError { get; private set; } = "";
 
         public MqttService(MqttSettings settings)
         {
@@ -43,45 +50,94 @@ namespace AppLauncher.Features.MqttControl
         {
             try
             {
+                LogMessage?.Invoke($"MQTT 연결 시도: {_settings.Broker}:{_settings.Port}");
+
                 var factory = new MqttClientFactory();
                 _mqttClient = factory.CreateMqttClient();
 
-                var optionsBuilder = new MqttClientOptionsBuilder()
-                    .WithTcpServer(_settings.Broker, _settings.Port)
-                    .WithClientId(_settings.ClientId);
-
-                // 사용자 이름/비밀번호가 있으면 추가
-                if (!string.IsNullOrEmpty(_settings.Username))
-                {
-                    optionsBuilder = optionsBuilder.WithCredentials(_settings.Username, _settings.Password);
-                }
-
-                var options = optionsBuilder.Build();
-
-                // 메시지 수신 핸들러 등록
                 _mqttClient.ApplicationMessageReceivedAsync += OnMessageReceivedAsync;
-
-                // 연결 끊김 핸들러 등록
                 _mqttClient.DisconnectedAsync += OnDisconnectedAsync;
 
-                // 브로커 연결
-                await _mqttClient.ConnectAsync(options, CancellationToken.None);
+                MqttClientConnectResult? result = null;
+                var protocolVersions = new[]
+                {
+                    (MQTTnet.Formatter.MqttProtocolVersion.V311, "MQTT 3.1.1"),
+                    (MQTTnet.Formatter.MqttProtocolVersion.V310, "MQTT 3.1.0"),
+                    (MQTTnet.Formatter.MqttProtocolVersion.V500, "MQTT 5.0")
+                };
+
+                Exception? lastException = null;
+
+                foreach (var (version, versionName) in protocolVersions)
+                {
+                    try
+                    {
+                        LogMessage?.Invoke($"{versionName} 연결 시도 중...");
+
+                        var optionsBuilder = new MqttClientOptionsBuilder()
+                            .WithTcpServer(_settings.Broker, _settings.Port)
+                            .WithClientId(_settings.ClientId)
+                            .WithCleanSession(false)
+                            .WithKeepAlivePeriod(TimeSpan.FromSeconds(60))
+                            .WithTimeout(TimeSpan.FromSeconds(10))
+                            .WithProtocolVersion(version);
+
+                        if (!string.IsNullOrEmpty(_settings.Username))
+                        {
+                            optionsBuilder = optionsBuilder.WithCredentials(_settings.Username, _settings.Password);
+                        }
+
+                        var options = optionsBuilder.Build();
+                        result = await _mqttClient.ConnectAsync(options, CancellationToken.None);
+
+                        if (result.ResultCode == MqttClientConnectResultCode.Success)
+                        {
+                            LogMessage?.Invoke($"{versionName} 연결 성공!");
+                            break;
+                        }
+                        else
+                        {
+                            LogMessage?.Invoke($"{versionName} 연결 실패: {result.ResultCode} - {result.ReasonString}");
+                            lastException = new Exception($"{versionName} 연결 실패: {result.ResultCode} - {result.ReasonString}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        LogMessage?.Invoke($"{versionName} 연결 실패: {ex.Message}");
+                        if (ex.InnerException != null)
+                        {
+                            LogMessage?.Invoke($"  내부 오류: {ex.InnerException.Message}");
+                        }
+                        lastException = ex;
+                    }
+                }
+
+                if (result == null || result.ResultCode != MqttClientConnectResultCode.Success)
+                {
+                    throw lastException ?? new Exception("모든 MQTT 프로토콜 버전에서 연결 실패");
+                }
 
                 _isConnected = true;
+                LastError = "";
                 ConnectionStateChanged?.Invoke(true);
 
-                // 토픽 구독
+                var usedVersion = _mqttClient.Options.ProtocolVersion;
+                LogMessage?.Invoke($"사용된 MQTT 프로토콜 버전: {usedVersion}");
+
                 var subscribeOptions = factory.CreateSubscribeOptionsBuilder()
                     .WithTopicFilter(f => f.WithTopic(_settings.Topic))
                     .Build();
 
                 await _mqttClient.SubscribeAsync(subscribeOptions, CancellationToken.None);
+                LogMessage?.Invoke($"토픽 구독 완료: {_settings.Topic}");
             }
             catch (Exception ex)
             {
                 _isConnected = false;
+                LastError = $"MQTT 연결 오류: {ex.Message}";
                 ConnectionStateChanged?.Invoke(false);
-                throw new Exception($"MQTT 연결 실패: {ex.Message}", ex);
+                LogMessage?.Invoke(LastError);
+                throw new Exception(LastError, ex);
             }
         }
 
@@ -153,25 +209,15 @@ namespace AppLauncher.Features.MqttControl
             return Task.CompletedTask;
         }
 
-        private async Task OnDisconnectedAsync(MqttClientDisconnectedEventArgs e)
+        private Task OnDisconnectedAsync(MqttClientDisconnectedEventArgs e)
         {
             _isConnected = false;
             ConnectionStateChanged?.Invoke(false);
 
-            // 재연결 시도
-            if (e.ClientWasConnected)
-            {
-                await Task.Delay(TimeSpan.FromSeconds(5));
+            LogMessage?.Invoke("MQTT 연결이 끊어졌습니다.");
 
-                try
-                {
-                    await ConnectAsync();
-                }
-                catch
-                {
-                    // 재연결 실패 시 추가 재시도는 사용자가 수동으로 하도록
-                }
-            }
+            // 자동 재연결 비활성화 - 사용자가 수동으로 재연결하도록
+            return Task.CompletedTask;
         }
 
         public void Dispose()

@@ -7,14 +7,42 @@ namespace AppLauncher.Shared.Configuration
     public class ConfigManager
     {
         private const string ConfigFileName = "launcher_config.json";
+        private const string AppName = "AppLauncher";
+
+        // AppData 경로 가져오기
+        private static string GetAppDataConfigPath()
+        {
+            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string appFolder = Path.Combine(appDataPath, AppName);
+
+            if (!Directory.Exists(appFolder))
+            {
+                Directory.CreateDirectory(appFolder);
+            }
+
+            return Path.Combine(appFolder, ConfigFileName);
+        }
+
+        // 기존 설정이 있는지 확인 (이전 버전 호환성)
+        private static string GetLegacyConfigPath()
+        {
+            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ConfigFileName);
+        }
 
         public static LauncherConfig LoadConfig()
         {
             try
             {
-                string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ConfigFileName);
+                string appDataConfigPath = GetAppDataConfigPath();
+                string legacyConfigPath = GetLegacyConfigPath();
 
-                if (!File.Exists(configPath))
+                // AppData에 설정이 없고 기존 위치에 있으면 마이그레이션
+                if (!File.Exists(appDataConfigPath) && File.Exists(legacyConfigPath))
+                {
+                    File.Copy(legacyConfigPath, appDataConfigPath, true);
+                }
+
+                if (!File.Exists(appDataConfigPath))
                 {
                     // 기본 설정 생성
                     var defaultConfig = CreateDefaultConfig();
@@ -22,7 +50,7 @@ namespace AppLauncher.Shared.Configuration
                     return defaultConfig;
                 }
 
-                string json = File.ReadAllText(configPath);
+                string json = File.ReadAllText(appDataConfigPath);
                 var config = JsonConvert.DeserializeObject<LauncherConfig>(json);
 
                 return config ?? CreateDefaultConfig();
@@ -37,7 +65,7 @@ namespace AppLauncher.Shared.Configuration
         {
             try
             {
-                string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ConfigFileName);
+                string configPath = GetAppDataConfigPath();
                 string json = JsonConvert.SerializeObject(config, Formatting.Indented);
                 File.WriteAllText(configPath, json);
             }
@@ -45,6 +73,11 @@ namespace AppLauncher.Shared.Configuration
             {
                 throw new Exception($"설정 파일 저장 실패: {ex.Message}");
             }
+        }
+
+        public static string GetConfigFilePath()
+        {
+            return GetAppDataConfigPath();
         }
 
         private static LauncherConfig CreateDefaultConfig()
@@ -95,6 +128,13 @@ namespace AppLauncher.Shared.Configuration
         /// </summary>
         [JsonProperty("localVersionFile")]
         public string LocalVersionFile { get; set; } = "";
+
+
+        /// <summary>
+        /// 런처 버전 파일 경로
+        /// </summary>
+        [JsonProperty("launcherVersionFile")]
+        public string? LauncherVersionFile { get; set; }
 
         /// <summary>
         /// MQTT 연결 설정

@@ -1,16 +1,34 @@
-# App Launcher
+# AppLauncher
 
-MQTT 기반 원격 제어가 가능한 C# WPF 트레이 런처 애플리케이션입니다.
+MQTT를 통한 원격 제어가 가능한 애플리케이션 런처 및 업데이트 관리 도구
 
 ## 주요 기능
 
-- **트레이 앱 방식**: 시스템 트레이에서 백그라운드로 실행 (UI 없음)
-- **MQTT 원격 제어**: MQTT 메시지를 통한 원격 프로그램 실행 및 제어
-- **자동 버전 체크**: 시작 시 원격 서버에서 최신 버전 확인 (선택사항)
-- **자동 업데이트**: 구버전 감지 시 자동으로 업데이트 진행 (선택사항)
-- **작업 스케줄러 등록**: Windows 로그온 시 관리자 권한으로 자동 실행 (UAC 프롬프트 없음)
-- **상태 확인**: 트레이 아이콘 우클릭 또는 더블클릭으로 상태 창 표시
-- **커스텀 아이콘**: 로켓 모양의 커스텀 아이콘 적용
+### 1. 원격 제어 (MQTT)
+- MQTT 브로커를 통한 원격 명령 수신
+- **런처 자체 업데이트 제어**: 런처 프로그램 자동 업데이트
+- **대상 앱 업데이트 제어**: 관리 대상 애플리케이션 자동 업데이트
+- 실시간 상태 모니터링 및 응답
+
+### 2. 자동 업데이트
+- 두 가지 독립적인 업데이트 경로:
+  - 런처(실행기) 자체 업데이트
+  - 대상 애플리케이션 업데이트
+- 버전 체크 및 자동 다운로드
+- 실행 중인 프로세스 종료 및 파일 교체
+- 백업 및 복구 기능
+
+### 3. 트레이 앱
+- 시스템 트레이에서 상시 실행
+- **중복 실행 방지** (Mutex 사용)
+- Windows 시작 프로그램 자동 등록 (작업 스케줄러)
+- 관리자 권한 자동 획득
+
+### 4. 설정 관리
+- **AppData에 설정 저장** (`%AppData%\AppLauncher\`)
+- 런처 업데이트 후에도 설정 유지
+- UI를 통한 MQTT 설정 관리
+- MQTT 제어 센터 (연결 상태, 로그 확인)
 
 ## 빌드 방법
 
@@ -38,8 +56,10 @@ dotnet build --configuration Release
 {
   "targetExecutable": "C:\\Program Files\\YourApp\\YourApp.exe",
   "workingDirectory": "C:\\Program Files\\YourApp",
-  "versionCheckUrl": "https://example.com/version.json",
+  "versionCheckUrl": "https://example.com/target_app_version.json",
   "localVersionFile": "version.txt",
+  "launcherUpdateUrl": "https://example.com/launcher_version.json",
+  "launcherVersionFile": "launcher_version.txt",
   "mqttSettings": {
     "broker": "mqtt.example.com",
     "port": 1883,
@@ -53,11 +73,15 @@ dotnet build --configuration Release
 
 ### 설정 항목 설명
 
-#### 기본 설정
+#### 대상 애플리케이션 설정
 - **targetExecutable**: 실행할 대상 프로그램의 전체 경로
 - **workingDirectory**: 대상 프로그램의 작업 디렉토리 (선택사항)
-- **versionCheckUrl**: 버전 정보를 확인할 URL (JSON 형식, 선택사항)
-- **localVersionFile**: 로컬 버전 파일 경로 (없으면 자동 생성됨, 기본값: 1.0.0)
+- **versionCheckUrl**: 대상 앱 버전 정보를 확인할 URL (JSON 형식, 선택사항)
+- **localVersionFile**: 대상 앱 로컬 버전 파일 경로 (없으면 자동 생성됨, 기본값: 1.0.0)
+
+#### 런처 자체 업데이트 설정
+- **launcherUpdateUrl**: 런처 자체 버전 정보를 확인할 URL (JSON 형식, 선택사항)
+- **launcherVersionFile**: 런처 로컬 버전 파일 경로 (기본값: launcher_version.txt)
 
 #### MQTT 설정 (선택사항)
 - **broker**: MQTT 브로커 주소 (예: mqtt.example.com 또는 localhost)
@@ -110,9 +134,31 @@ MQTT를 통해 프로그램을 원격으로 실행하려면 다음 형식의 JSO
 }
 ```
 
+#### 런처 자체 업데이트 명령
+```json
+{
+  "command": "update_launcher"
+}
+```
+또는
+```json
+{
+  "command": "updatelauncher"
+}
+```
+
+이 명령은:
+1. `launcherUpdateUrl`에서 최신 버전 정보를 확인합니다
+2. 업데이트가 필요하면 새 버전을 다운로드합니다
+3. 현재 실행 중인 런처를 종료하고 새 버전으로 교체합니다
+4. 새 버전을 자동으로 실행하고 재시작합니다
+
+**참고**: 런처 업데이트 후에도 `%AppData%\AppLauncher\`에 저장된 설정은 유지됩니다.
+
 ### MQTT 명령 필드 설명
 
-- **command**: 명령 종류 (`launch`, `start`, `status`)
+#### 프로그램 실행 명령 (launch, start)
+- **command**: 명령 종류 (`launch`, `start`, `status`, `update_launcher`)
 - **downloadUrl**: 다운로드할 EXE 파일 URL (우선순위 1)
 - **executable**: 실행할 로컬 프로그램 경로 (우선순위 2)
 - **workingDirectory**: 작업 디렉토리 (선택사항)
@@ -122,6 +168,10 @@ MQTT를 통해 프로그램을 원격으로 실행하려면 다음 형식의 JSO
 1. `downloadUrl`이 있으면: 파일 다운로드 후 실행
 2. `executable`이 있으면: 해당 경로의 파일 실행
 3. 둘 다 없으면: 설정 파일의 `targetExecutable` 실행
+
+#### 업데이트 명령 (update_launcher)
+- **command**: `update_launcher` 또는 `updatelauncher`
+- 추가 필드 불필요 (설정 파일의 `launcherUpdateUrl` 사용)
 
 ### MQTT 명령 예제 (Python)
 
@@ -163,12 +213,31 @@ client.publish("applauncher/commands", json.dumps(command))
 client.disconnect()
 ```
 
+#### 런처 자체 업데이트
+```python
+import paho.mqtt.client as mqtt
+import json
+
+# MQTT 클라이언트 생성
+client = mqtt.Client()
+client.username_pw_set("your_username", "your_password")
+client.connect("mqtt.example.com", 1883)
+
+# 런처 업데이트 명령
+command = {
+    "command": "update_launcher"
+}
+client.publish("applauncher/commands", json.dumps(command))
+client.disconnect()
+```
+
 ## 서버 설정
 
 ### 버전 JSON 파일 (version.json) - 선택사항
 
 자동 업데이트를 사용하려면 서버에 다음과 같은 형식의 JSON 파일을 호스팅합니다:
 
+#### 대상 애플리케이션 버전 파일 (target_app_version.json)
 ```json
 {
   "version": "1.0.5",
@@ -176,8 +245,19 @@ client.disconnect()
 }
 ```
 
-- **version**: 최신 버전 번호
+#### 런처 자체 버전 파일 (launcher_version.json)
+```json
+{
+  "version": "2.1.0",
+  "downloadUrl": "https://example.com/AppLauncher-2.1.0.exe"
+}
+```
+
+**필드 설명:**
+- **version**: 최신 버전 번호 (예: "1.0.5", "2.1.0")
 - **downloadUrl**: 업데이트 EXE 파일의 다운로드 URL
+
+**중요**: 두 가지 독립적인 버전 파일을 사용하여 런처와 대상 앱을 별도로 관리할 수 있습니다.
 
 ## 실행 방법 및 동작 순서
 
@@ -219,6 +299,9 @@ client.disconnect()
 - **더블클릭**: 상태 창 표시
 - **우클릭 메뉴**:
   - **상태 보기**: 현재 진행 상황을 보여주는 창 열기
+  - **MQTT 제어 센터**: MQTT 연결 상태, 로그, 클라이언트 정보 확인
+  - **MQTT 설정**: MQTT 브로커 주소, 포트, 클라이언트 ID 등 설정 변경
+  - **런처 업데이트 확인**: 런처 자체 업데이트 수동 실행
   - **시작프로그램 등록 해제**: 작업 스케줄러에서 제거
   - **종료**: 런처 즉시 종료
 
@@ -298,18 +381,58 @@ AppLauncher/
 └── launcher_config.json                # 런처 설정
 ```
 
+## 업데이트 시스템 상세
+
+### 두 가지 독립적인 업데이트 경로
+
+AppLauncher는 두 가지 독립적인 업데이트 메커니즘을 제공합니다:
+
+#### 1. 런처 자체 업데이트
+- **설정 필드**: `launcherUpdateUrl`, `launcherVersionFile`
+- **MQTT 명령**: `update_launcher` 또는 `updatelauncher`
+- **트레이 메뉴**: "런처 업데이트 확인" 클릭
+- **동작 과정**:
+  1. 서버의 `launcher_version.json`에서 최신 버전 확인
+  2. 업데이트가 필요하면 새 EXE 다운로드
+  3. 현재 실행 중인 `AppLauncher.exe` 프로세스 종료
+  4. 기존 파일을 `.backup`으로 백업
+  5. 다운로드한 파일로 교체
+  6. 새 버전 자동 실행
+- **설정 유지**: `%AppData%\AppLauncher\` 폴더에 저장된 설정은 업데이트 후에도 보존됨
+
+#### 2. 대상 애플리케이션 업데이트
+- **설정 필드**: `versionCheckUrl`, `localVersionFile`
+- **MQTT 명령**: `launch` 명령으로 새 버전의 `downloadUrl` 제공
+- **동작 과정**:
+  1. 서버의 `target_app_version.json`에서 최신 버전 확인
+  2. 업데이트가 필요하면 새 EXE 다운로드
+  3. 대상 앱 프로세스 종료 (실행 중인 경우)
+  4. 파일 교체
+  5. 업데이트된 앱 실행
+
+### MQTT 제어 센터
+
+트레이 메뉴에서 "MQTT 제어 센터"를 통해 다음 정보를 확인할 수 있습니다:
+- **연결 상태**: 연결됨 / 연결 안됨
+- **브로커 정보**: `broker:port`
+- **클라이언트 ID**: 현재 MQTT 클라이언트 ID
+- **구독 토픽**: 현재 구독 중인 토픽
+- **실시간 로그**: MQTT 메시지 수신 및 연결 상태 변경 로그
+
 ## 참고사항
 
 - 첫 실행 시 반드시 **관리자 권한**으로 실행해야 작업 스케줄러에 등록됩니다
 - `launcher_config.json`이 없으면 자동 생성되므로, 생성 후 수정해야 합니다
 - **MQTT 모드**: `mqttSettings`를 설정하면 트레이에 상주하며 MQTT 명령 대기
 - **레거시 모드**: MQTT 미설정 시 버전 체크 후 자동 실행 및 종료
+- **중복 실행 방지**: Mutex를 사용하여 동시에 여러 인스턴스가 실행되지 않도록 보장
 - MQTT를 통해 다운로드 URL을 받으면 자동으로 파일 다운로드 후 실행
 - 다운로드한 파일은 임시 폴더에 저장되며, 실행 후 자동 삭제되지 않음
 - 업데이트 서버는 HTTPS를 권장합니다
 - 작업 스케줄러를 통해 등록되므로 UAC 프롬프트 없이 자동 시작됩니다
 - 런처는 백그라운드에서 실행되며 UI 창은 기본적으로 표시되지 않습니다
 - 트레이 아이콘 더블클릭 시 상태 창을 볼 수 있습니다
+- **설정 위치**: 모든 설정은 `%AppData%\AppLauncher\launcher_config.json`에 저장되어 런처 업데이트 후에도 유지됩니다
 
 ## 사용된 라이브러리
 

@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Windows;
 using Microsoft.Win32;
 using AppLauncher.Features.TrayApp;
@@ -9,10 +10,29 @@ namespace AppLauncher.Presentation.WPF
     public partial class App : Application
     {
         private TrayApplicationContext? _trayContext;
+        private Mutex? _mutex;
 
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
+
+            // 중복 실행 방지
+            const string mutexName = "Global\\AppLauncher_SingleInstance";
+            bool createdNew;
+            _mutex = new Mutex(true, mutexName, out createdNew);
+
+            if (!createdNew)
+            {
+                // 이미 실행 중
+                MessageBox.Show(
+                    "AppLauncher가 이미 실행 중입니다.\n트레이 아이콘을 확인해주세요.",
+                    "중복 실행",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information
+                );
+                Shutdown();
+                return;
+            }
 
             // 작업 스케줄러에 등록되어 있는지 확인
             if (!TaskSchedulerManager.IsTaskRegistered())
@@ -40,6 +60,8 @@ namespace AppLauncher.Presentation.WPF
         protected override void OnExit(ExitEventArgs e)
         {
             _trayContext?.Dispose();
+            _mutex?.ReleaseMutex();
+            _mutex?.Dispose();
             base.OnExit(e);
         }
 
