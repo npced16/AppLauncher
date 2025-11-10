@@ -84,7 +84,7 @@ namespace AppLauncher.Features.MqttControl
 
                         if (!string.IsNullOrEmpty(_settings.Username))
                         {
-                            optionsBuilder = optionsBuilder.WithCredentials(_settings.Username, _settings.Password);
+                            optionsBuilder = optionsBuilder.WithCredentials(_settings.Username, "");
                         }
 
                         var options = optionsBuilder.Build();
@@ -263,5 +263,9 @@ namespace AppLauncher.Features.MqttControl
 
         [JsonProperty("arguments")]
         public string? Arguments { get; set; }
+
+        // 업데이트 명령용 필드
+        [JsonProperty("version")]
+        public string? Version { get; set; }
     }
 }

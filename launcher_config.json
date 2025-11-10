@@ -4,11 +4,10 @@
   "versionCheckUrl": "",
   "localVersionFile": "version.txt",
   "mqttSettings": {
-    "broker": "localhost",
+    "broker": "server3.ibexserver.com",
     "port": 1883,
     "clientId": "AppLauncher",
     "topic": "applauncher/commands",
-    "username": "",
-    "password": ""
+    "chamberName": ""
   }
 }

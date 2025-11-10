@@ -4,17 +4,27 @@ MQTT를 통한 원격 제어가 가능한 애플리케이션 런처 및 업데�
 
 ## 주요 기능
 
+
+//powersell 윈도우 7 이상부터 기본내장
+powershell -Command "Start-Process '.\setup.exe' -ArgumentList '/q','/AcceptLicenses','yes','/log','C:\install_log.txt' -Verb RunAs"
+
+
+//강제종료추가
+powershell -Command "Start-Process '.\setup.exe' -ArgumentList '/q','/AcceptLicenses','yes','/log','C:\install_log.txt' -Verb RunAs; Start-Sleep -Seconds 1800; Get-Process 'setup' -ErrorAction SilentlyContinue | Stop-Process -Force"
+
 ### 1. 원격 제어 (MQTT)
 - MQTT 브로커를 통한 원격 명령 수신
-- **런처 자체 업데이트 제어**: 런처 프로그램 자동 업데이트
-- **대상 앱 업데이트 제어**: 관리 대상 애플리케이션 자동 업데이트
+- **런처 자체 업데이트 제어**: MQTT 명령으로 런처 프로그램 자동 업데이트
+- **대상 앱 업데이트 제어**: MQTT 명령으로 관리 대상 애플리케이션 자동 업데이트
+- **중앙 관제**: 연결 시 자동으로 현재 버전 정보 보고 (런처 버전 + 대상 앱 버전)
 - 실시간 상태 모니터링 및 응답
 
-### 2. 자동 업데이트
+### 2. MQTT 기반 자동 업데이트
+- 중앙 서버에서 MQTT를 통해 모든 업데이트 관리
 - 두 가지 독립적인 업데이트 경로:
   - 런처(실행기) 자체 업데이트
   - 대상 애플리케이션 업데이트
-- 버전 체크 및 자동 다운로드
+5- 다운로드 URL과 버전 정보를 MQTT 명령에 포함
 - 실행 중인 프로세스 종료 및 파일 교체
 - 백업 및 복구 기능
 
@@ -32,6 +42,8 @@ MQTT를 통한 원격 제어가 가능한 애플리케이션 런처 및 업데�
 
 ## 빌드 방법
 
+### 일반 빌드
+
 ```bash
 dotnet restore
 dotnet build
@@ -48,6 +60,64 @@ dotnet build --configuration Release
 - Debug: `bin\Debug\net9.0-windows\AppLauncher.exe`
 - Release: `bin\Release\net9.0-windows\AppLauncher.exe`
 
+### 단일 파일 배포용 빌드 (GitHub Releases용)
+
+GitHub Releases에 업로드하거나 MQTT를 통해 배포할 단일 EXE 파일을 생성하려면:
+
+```bash
+dotnet publish --configuration Release --runtime win-x64 --self-contained false -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+```
+
+빌드된 파일 위치:
+- `bin\Release\net9.0-windows\win-x64\publish\AppLauncher.exe` (약 1.5MB)
+
+이 파일은:
+- 단일 실행 파일로 패키징됨
+- .NET 9 런타임 필요 (설치되어 있어야 함)
+- GitHub Releases에 업로드하여 직접 다운로드 링크로 사용 가능
+
+### GitHub Releases에 업로드
+
+1. **GitHub 리포지토리의 Releases 페이지로 이동**
+   - `https://github.com/YOUR_USERNAME/AppLauncher/releases`
+
+2. **새 릴리스 생성**
+   - "Draft a new release" 클릭
+
+3. **릴리스 정보 입력**
+   - **Tag version**: `v1.0.0` (버전 번호)
+   - **Release title**: `AppLauncher v1.0.0`
+   - **Description**: 릴리스 노트 작성
+
+4. **EXE 파일 업로드**
+   - "Attach binaries..." 클릭
+   - `bin\Release\net9.0-windows\win-x64\publish\AppLauncher.exe` 파일 드래그 앤 드롭
+
+5. **릴리스 퍼블리시**
+   - "Publish release" 클릭
+
+### 다운로드 링크 사용
+
+릴리스가 퍼블리시되면 다음과 같은 **직접 다운로드 링크**를 얻게 됩니다:
+
+```
+https://github.com/YOUR_USERNAME/AppLauncher/releases/download/v1.0.0/AppLauncher.exe
+```
+
+이 링크는:
+- 브라우저에서 바로 다운로드됨
+- WPF 애플리케이션에서 HttpClient로 다운로드 가능
+- MQTT 업데이트 명령의 `downloadUrl`로 사용 가능
+
+**MQTT 업데이트 명령 예시:**
+```json
+{
+  "command": "update_launcher",
+  "downloadUrl": "https://github.com/YOUR_USERNAME/AppLauncher/releases/download/v1.0.0/AppLauncher.exe",
+  "version": "1.0.0"
+}
+```
+
 ## 설정 방법
 
 `launcher_config.json` 파일을 수정하여 설정합니다:
@@ -58,15 +128,12 @@ dotnet build --configuration Release
   "workingDirectory": "C:\\Program Files\\YourApp",
   "versionCheckUrl": "https://example.com/target_app_version.json",
   "localVersionFile": "version.txt",
-  "launcherUpdateUrl": "https://example.com/launcher_version.json",
   "launcherVersionFile": "launcher_version.txt",
   "mqttSettings": {
     "broker": "mqtt.example.com",
     "port": 1883,
-    "clientId": "AppLauncher",
+    "clientId": "AppLauncher_PC01",
     "topic": "applauncher/commands",
-    "username": "your_username",
-    "password": "your_password"
   }
 }
 ```
@@ -76,15 +143,14 @@ dotnet build --configuration Release
 #### 대상 애플리케이션 설정
 - **targetExecutable**: 실행할 대상 프로그램의 전체 경로
 - **workingDirectory**: 대상 프로그램의 작업 디렉토리 (선택사항)
-- **versionCheckUrl**: 대상 앱 버전 정보를 확인할 URL (JSON 형식, 선택사항)
-- **localVersionFile**: 대상 앱 로컬 버전 파일 경로 (없으면 자동 생성됨, 기본값: 1.0.0)
+- **versionCheckUrl**: 대상 앱 버전 정보를 확인할 URL (JSON 형식, 레거시 모드에서만 사용)
+- **localVersionFile**: 대상 앱 로컬 버전 파일 경로 (버전 추적용)
 
-#### 런처 자체 업데이트 설정
-- **launcherUpdateUrl**: 런처 자체 버전 정보를 확인할 URL (JSON 형식, 선택사항)
+#### 런처 버전 추적
 - **launcherVersionFile**: 런처 로컬 버전 파일 경로 (기본값: launcher_version.txt)
 
 #### MQTT 설정 (선택사항)
-- **broker**: MQTT 브로커 주소 (예: mqtt.example.com 또는 localhost)
+- **broker**: MQTT 브로커 주소 (기본값:localHost)
 - **port**: MQTT 브로커 포트 (기본값: 1883)
 - **clientId**: MQTT 클라이언트 ID (기본값: AppLauncher)
 - **topic**: 명령을 수신할 MQTT 토픽 (기본값: applauncher/commands)
@@ -137,21 +203,20 @@ MQTT를 통해 프로그램을 원격으로 실행하려면 다음 형식의 JSO
 #### 런처 자체 업데이트 명령
 ```json
 {
-  "command": "update_launcher"
-}
-```
-또는
-```json
-{
-  "command": "updatelauncher"
+  "command": "update_launcher",
+  "downloadUrl": "https://example.com/AppLauncher-2.1.0.exe",
+  "version": "2.1.0"
 }
 ```
 
 이 명령은:
-1. `launcherUpdateUrl`에서 최신 버전 정보를 확인합니다
-2. 업데이트가 필요하면 새 버전을 다운로드합니다
-3. 현재 실행 중인 런처를 종료하고 새 버전으로 교체합니다
-4. 새 버전을 자동으로 실행하고 재시작합니다
+1. MQTT 메시지에서 제공된 다운로드 URL로 새 버전을 다운로드합니다
+2. 현재 실행 중인 런처를 종료하고 새 버전으로 교체합니다
+3. 새 버전을 자동으로 실행하고 재시작합니다
+
+**필수 필드:**
+- `downloadUrl`: 새 런처 EXE 파일의 다운로드 URL
+- `version`: 새 버전 번호 (예: "2.1.0")
 
 **참고**: 런처 업데이트 후에도 `%AppData%\AppLauncher\`에 저장된 설정은 유지됩니다.
 
@@ -223,19 +288,113 @@ client = mqtt.Client()
 client.username_pw_set("your_username", "your_password")
 client.connect("mqtt.example.com", 1883)
 
-# 런처 업데이트 명령
+# 런처 업데이트 명령 (다운로드 URL과 버전 포함)
 command = {
-    "command": "update_launcher"
+    "command": "update_launcher",
+    "downloadUrl": "https://example.com/AppLauncher-2.1.0.exe",
+    "version": "2.1.0"
 }
 client.publish("applauncher/commands", json.dumps(command))
 client.disconnect()
 ```
 
-## 서버 설정
+## 중앙 관제 (MQTT 기반)
+
+### 자동 버전 정보 보고
+
+런처는 MQTT 브로커에 연결되면 자동으로 현재 버전 정보를 중앙 서버에 보고합니다.
+
+#### 보고되는 정보
+
+```json
+{
+  "type": "version_report",
+  "clientId": "AppLauncher_PC01",
+  "hostname": "DESKTOP-ABC123",
+  "username": "user",
+  "timestamp": "2025-01-15T10:30:45",
+  "launcher": {
+    "version": "2.0.5",
+    "executablePath": "C:\\Program Files\\AppLauncher\\AppLauncher.exe"
+  },
+  "targetApp": {
+    "version": "1.3.2",
+    "executablePath": "C:\\Program Files\\YourApp\\YourApp.exe"
+  }
+}
+```
+
+#### 버전 정보가 발행되는 토픽
+
+- **토픽**: `applauncher/status` (명령 토픽에서 `/commands`를 `/status`로 대체)
+- **발행 시점**: MQTT 브로커 연결 성공 시 자동 발행
+
+### 중앙 서버 구축 예제 (Python)
+
+```python
+import paho.mqtt.client as mqtt
+import json
+from datetime import datetime
+
+# 클라이언트별 버전 정보 저장
+client_versions = {}
+
+def on_message(client, userdata, message):
+    try:
+        payload = json.loads(message.payload.decode())
+
+        # 버전 정보 보고 수신
+        if payload.get("type") == "version_report":
+            client_id = payload.get("clientId")
+            client_versions[client_id] = {
+                "hostname": payload.get("hostname"),
+                "launcher_version": payload["launcher"]["version"],
+                "target_app_version": payload["targetApp"]["version"],
+                "last_seen": payload.get("timestamp"),
+                "updated_at": datetime.now().isoformat()
+            }
+
+            print(f"[{client_id}] 버전 정보 수신:")
+            print(f"  - 런처: {payload['launcher']['version']}")
+            print(f"  - 대상 앱: {payload['targetApp']['version']}")
+
+            # 업데이트가 필요한 경우 명령 전송
+            if payload['launcher']['version'] < "2.1.0":
+                send_launcher_update(client, client_id)
+
+def send_launcher_update(client, client_id):
+    """특정 클라이언트에게 런처 업데이트 명령 전송"""
+    command = {
+        "command": "update_launcher",
+        "downloadUrl": "https://example.com/AppLauncher-2.1.0.exe",
+        "version": "2.1.0"
+    }
+    # 클라이언트별 토픽 사용 가능
+    client.publish("applauncher/commands", json.dumps(command))
+    print(f"[{client_id}]에게 업데이트 명령 전송")
+
+# MQTT 클라이언트 설정
+client = mqtt.Client()
+client.username_pw_set("admin", "admin_password")
+client.on_message = on_message
+
+client.connect("mqtt.example.com", 1883)
+client.subscribe("applauncher/status")  # 상태 토픽 구독
+client.loop_forever()
+```
+
+### 중앙 관제의 장점
+
+1. **실시간 모니터링**: 모든 클라이언트의 현재 버전을 실시간으로 확인
+2. **선택적 업데이트**: 특정 버전의 클라이언트에게만 업데이트 명령 전송
+3. **중앙 집중식 관리**: 별도의 버전 파일 서버 없이 MQTT만으로 모든 관리
+4. **유연한 배포**: 단계적 업데이트(Canary Deployment) 가능
+
+## 서버 설정 (레거시 모드)
 
 ### 버전 JSON 파일 (version.json) - 선택사항
 
-자동 업데이트를 사용하려면 서버에 다음과 같은 형식의 JSON 파일을 호스팅합니다:
+MQTT 없이 자동 업데이트를 사용하려면 서버에 다음과 같은 형식의 JSON 파일을 호스팅합니다:
 
 #### 대상 애플리케이션 버전 파일 (target_app_version.json)
 ```json
@@ -245,19 +404,11 @@ client.disconnect()
 }
 ```
 
-#### 런처 자체 버전 파일 (launcher_version.json)
-```json
-{
-  "version": "2.1.0",
-  "downloadUrl": "https://example.com/AppLauncher-2.1.0.exe"
-}
-```
-
 **필드 설명:**
-- **version**: 최신 버전 번호 (예: "1.0.5", "2.1.0")
+- **version**: 최신 버전 번호 (예: "1.0.5")
 - **downloadUrl**: 업데이트 EXE 파일의 다운로드 URL
 
-**중요**: 두 가지 독립적인 버전 파일을 사용하여 런처와 대상 앱을 별도로 관리할 수 있습니다.
+**참고**: MQTT 모드에서는 이 파일이 불필요합니다. 모든 업데이트는 MQTT 명령으로 처리됩니다.
 
 ## 실행 방법 및 동작 순서
 
@@ -302,14 +453,11 @@ client.disconnect()
   - **MQTT 제어 센터**: MQTT 연결 상태, 로그, 클라이언트 정보 확인
   - **MQTT 설정**: MQTT 브로커 주소, 포트, 클라이언트 ID 등 설정 변경
   - **런처 업데이트 확인**: 런처 자체 업데이트 수동 실행
-  - **시작프로그램 등록 해제**: 작업 스케줄러에서 제거
   - **종료**: 런처 즉시 종료
 
-## 시작프로그램 등록 해제
 
 ### 방법 1: 트레이 메뉴 사용
 1. 트레이 아이콘 우클릭
-2. "시작프로그램 등록 해제" 클릭
 3. 확인 메시지에서 "예" 클릭
 
 ### 방법 2: 작업 스케줄러에서 수동 제거

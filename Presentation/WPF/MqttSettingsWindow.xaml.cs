@@ -27,22 +27,14 @@ namespace AppLauncher.Presentation.WPF
 
                 if (_config.MqttSettings != null)
                 {
-                    BrokerTextBox.Text = _config.MqttSettings.Broker ?? "localhost";
-                    PortTextBox.Text = _config.MqttSettings.Port.ToString();
-                    ClientIdTextBox.Text = _config.MqttSettings.ClientId ?? "AppLauncher";
-                    TopicTextBox.Text = _config.MqttSettings.Topic ?? "applauncher/commands";
+                    // 브로커와 포트는 표시만 (편집 불가)
+                    BrokerText.Text = _config.MqttSettings.Broker;
+                    PortText.Text = _config.MqttSettings.Port.ToString();
+
+                    // 편집 가능한 필드들
+                    ClientIdTextBox.Text = _config.MqttSettings.ClientId;
+                    TopicTextBox.Text = _config.MqttSettings.Topic;
                     UsernameTextBox.Text = _config.MqttSettings.Username ?? "";
-                    PasswordBox.Password = _config.MqttSettings.Password ?? "";
-                }
-                else
-                {
-                    // 기본값 설정
-                    BrokerTextBox.Text = "localhost";
-                    PortTextBox.Text = "1883";
-                    ClientIdTextBox.Text = "AppLauncher";
-                    TopicTextBox.Text = "applauncher/commands";
-                    UsernameTextBox.Text = "";
-                    PasswordBox.Password = "";
                 }
             }
             catch (Exception ex)
@@ -55,21 +47,7 @@ namespace AppLauncher.Presentation.WPF
         {
             try
             {
-                // 입력값 검증
-                if (string.IsNullOrWhiteSpace(BrokerTextBox.Text))
-                {
-                    MessageBox.Show("브로커 주소를 입력해주세요.", "입력 오류", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    BrokerTextBox.Focus();
-                    return;
-                }
-
-                if (!int.TryParse(PortTextBox.Text, out int port) || port <= 0 || port > 65535)
-                {
-                    MessageBox.Show("올바른 포트 번호를 입력해주세요. (1-65535)", "입력 오류", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    PortTextBox.Focus();
-                    return;
-                }
-
+                // 입력값 검증 (브로커와 포트는 읽기 전용이므로 검증 불필요)
                 if (string.IsNullOrWhiteSpace(ClientIdTextBox.Text))
                 {
                     MessageBox.Show("클라이언트 ID를 입력해주세요.", "입력 오류", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -84,18 +62,16 @@ namespace AppLauncher.Presentation.WPF
                     return;
                 }
 
-                // MQTT 설정 업데이트
+                // MQTT 설정 업데이트 (브로커와 포트는 제외)
                 if (_config.MqttSettings == null)
                 {
                     _config.MqttSettings = new MqttSettings();
                 }
 
-                _config.MqttSettings.Broker = BrokerTextBox.Text.Trim();
-                _config.MqttSettings.Port = port;
+                // 브로커와 포트는 변경하지 않음 (읽기 전용)
                 _config.MqttSettings.ClientId = ClientIdTextBox.Text.Trim();
                 _config.MqttSettings.Topic = TopicTextBox.Text.Trim();
                 _config.MqttSettings.Username = string.IsNullOrWhiteSpace(UsernameTextBox.Text) ? null : UsernameTextBox.Text.Trim();
-                _config.MqttSettings.Password = string.IsNullOrWhiteSpace(PasswordBox.Password) ? null : PasswordBox.Password;
 
                 // 설정 저장
                 ConfigManager.SaveConfig(_config);

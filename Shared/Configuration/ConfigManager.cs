@@ -94,8 +94,7 @@ namespace AppLauncher.Shared.Configuration
                     Port = 1883,
                     ClientId = "AppLauncher",
                     Topic = "applauncher/commands",
-                    Username = "",
-                    Password = ""
+                    Username = ""
                 }
             };
         }
@@ -174,11 +173,5 @@ namespace AppLauncher.Shared.Configuration
         /// </summary>
         [JsonProperty("username")]
         public string? Username { get; set; }
-
-        /// <summary>
-        /// MQTT 비밀번호 (선택사항)
-        /// </summary>
-        [JsonProperty("password")]
-        public string? Password { get; set; }
     }
 }

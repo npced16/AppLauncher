@@ -21,7 +21,6 @@ namespace AppLauncher.Features.TrayApp
         private NotifyIcon? _notifyIcon;
         private MainWindow? _mainWindow;
         private MqttControlWindow? _mqttControlWindow;
-        private MqttSettingsWindow? _mqttSettingsWindow;
         private MqttService? _mqttService;
         private LauncherConfig? _config;
 
@@ -76,29 +75,8 @@ namespace AppLauncher.Features.TrayApp
             mqttControlMenuItem.Click += ShowMqttControlWindow;
             contextMenu.Items.Add(mqttControlMenuItem);
 
-            var mqttReconnectMenuItem = new ToolStripMenuItem("MQTT 재연결");
-            mqttReconnectMenuItem.Click += (s, e) => ReconnectMqtt();
-            contextMenu.Items.Add(mqttReconnectMenuItem);
-
             contextMenu.Items.Add(new ToolStripSeparator());
 
-            var settingsMenuItem = new ToolStripMenuItem("설정");
-            settingsMenuItem.Click += ShowSettingsWindow;
-            contextMenu.Items.Add(settingsMenuItem);
-
-            contextMenu.Items.Add(new ToolStripSeparator());
-
-            var updateLauncherMenuItem = new ToolStripMenuItem("런처 업데이트 확인");
-            updateLauncherMenuItem.Click += CheckLauncherUpdate;
-            contextMenu.Items.Add(updateLauncherMenuItem);
-
-            contextMenu.Items.Add(new ToolStripSeparator());
-
-            var unregisterMenuItem = new ToolStripMenuItem("시작프로그램 등록 해제");
-            unregisterMenuItem.Click += UnregisterFromStartup;
-            contextMenu.Items.Add(unregisterMenuItem);
-
-            contextMenu.Items.Add(new ToolStripSeparator());
 
             var exitMenuItem = new ToolStripMenuItem("종료");
             exitMenuItem.Click += Exit;
@@ -161,7 +139,6 @@ namespace AppLauncher.Features.TrayApp
                 await _mqttService.ConnectAsync();
 
                 UpdateTrayStatus("MQTT 연결됨");
-                _notifyIcon?.ShowBalloonTip(2000, "MQTT 연결", "MQTT 브로커에 연결되었습니다.", ToolTipIcon.Info);
 
                 // 연결 성공 시 자동으로 현재 버전 정보 보고
                 await SendVersionInfoAsync();
@@ -174,7 +151,6 @@ namespace AppLauncher.Features.TrayApp
                     errorDetail += $"\n상세: {ex.InnerException.Message}";
                 }
                 UpdateTrayStatus($"MQTT 오류");
-                _notifyIcon?.ShowBalloonTip(5000, "MQTT 연결 실패", errorDetail, ToolTipIcon.Error);
             }
         }
 
@@ -202,7 +178,7 @@ namespace AppLauncher.Features.TrayApp
 
                     case "update_launcher":
                     case "updatelauncher":
-                        UpdateLauncherViaMqtt();
+                        UpdateLauncherViaMqtt(command);
                         break;
 
                     case "status":
@@ -225,12 +201,10 @@ namespace AppLauncher.Features.TrayApp
             if (isConnected)
             {
                 UpdateTrayStatus("MQTT 연결됨");
-                _notifyIcon?.ShowBalloonTip(2000, "MQTT", "브로커에 연결되었습니다.", ToolTipIcon.Info);
             }
             else
             {
                 UpdateTrayStatus("MQTT 연결 끊김");
-                _notifyIcon?.ShowBalloonTip(3000, "MQTT", "브로커 연결이 끊어졌습니다.", ToolTipIcon.Warning);
             }
         }
 
@@ -239,26 +213,6 @@ namespace AppLauncher.Features.TrayApp
             // 로그 메시지를 트레이 상태로 업데이트
             UpdateTrayStatus(message);
             System.Diagnostics.Debug.WriteLine($"[MQTT] {message}");
-        }
-
-        public async void ReconnectMqtt()
-        {
-            try
-            {
-                UpdateTrayStatus("MQTT 재연결 시도...");
-
-                if (_mqttService != null)
-                {
-                    await _mqttService.DisconnectAsync();
-                }
-
-                await StartMqttServiceAsync();
-            }
-            catch (Exception ex)
-            {
-                UpdateTrayStatus($"재연결 실패: {ex.Message}");
-                _notifyIcon?.ShowBalloonTip(3000, "MQTT 재연결 실패", ex.Message, ToolTipIcon.Error);
-            }
         }
 
         public string GetMqttStatus()
@@ -417,15 +371,27 @@ namespace AppLauncher.Features.TrayApp
                     return;
                 }
 
+                // 런처 버전 가져오기
+                string launcherVersion = GetLauncherVersion();
+
+                // 대상 앱 버전 가져오기
+                string targetAppVersion = GetTargetAppVersion();
+
                 var status = new
                 {
                     status = "running",
-                    timestamp = DateTime.Now,
-                    mqttConnected = _mqttService.IsConnected
+                    timestamp = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss"),
+                    mqttConnected = _mqttService.IsConnected,
+                    clientId = _config.MqttSettings.ClientId,
+                    hostname = Environment.MachineName,
+                    launcherVersion = launcherVersion,
+                    targetAppVersion = targetAppVersion
                 };
 
                 string responseTopic = $"{_config.MqttSettings.Topic}/status";
                 await _mqttService.PublishJsonAsync(responseTopic, status);
+
+                UpdateTrayStatus($"상태 전송 완료 (런처: {launcherVersion}, 앱: {targetAppVersion})");
             }
             catch (Exception ex)
             {
@@ -488,7 +454,12 @@ namespace AppLauncher.Features.TrayApp
             {
                 // 기존 MqttService 인스턴스를 전달
                 _mqttControlWindow = new MqttControlWindow(_mqttService);
-                _mqttControlWindow.Closed += (s, args) => _mqttControlWindow = null;
+                _mqttControlWindow.Closed += (s, args) =>
+                {
+                    _mqttControlWindow = null;
+                    // 설정이 변경되었을 수 있으므로 다시 로드
+                    _config = ConfigManager.LoadConfig();
+                };
                 _mqttControlWindow.Show();
             }
             else
@@ -497,56 +468,34 @@ namespace AppLauncher.Features.TrayApp
             }
         }
 
-        private void ShowSettingsWindow(object? sender, EventArgs e)
-        {
-            if (_mqttSettingsWindow == null || !_mqttSettingsWindow.IsVisible)
-            {
-                _mqttSettingsWindow = new MqttSettingsWindow();
-                _mqttSettingsWindow.Closed += (s, args) =>
-                {
-                    _mqttSettingsWindow = null;
-                    // 설정이 저장되었으면 config 다시 로드
-                    _config = ConfigManager.LoadConfig();
-                };
-                _mqttSettingsWindow.Show();
-            }
-            else
-            {
-                _mqttSettingsWindow.Activate();
-            }
-        }
-
-        private async void UpdateLauncherViaMqtt()
+        private async void UpdateLauncherViaMqtt(LaunchCommand command)
         {
             try
             {
                 UpdateTrayStatus("MQTT 명령: 런처 업데이트 시작");
                 _notifyIcon?.ShowBalloonTip(3000, "런처 업데이트", "MQTT 명령을 받아 런처 업데이트를 시작합니다...", ToolTipIcon.Info);
 
-                if (_config == null || string.IsNullOrWhiteSpace(_config.LauncherUpdateUrl))
+                // MQTT 명령에서 다운로드 URL과 버전 정보 확인
+                if (string.IsNullOrWhiteSpace(command.DownloadUrl))
                 {
-                    _notifyIcon?.ShowBalloonTip(3000, "업데이트 실패", "런처 업데이트 URL이 설정되지 않았습니다.", ToolTipIcon.Warning);
-                    SendStatusResponse("error", "Launcher update URL not configured");
+                    _notifyIcon?.ShowBalloonTip(3000, "업데이트 실패", "다운로드 URL이 제공되지 않았습니다.", ToolTipIcon.Warning);
+                    SendStatusResponse("error", "Download URL not provided in MQTT command");
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(command.Version))
+                {
+                    _notifyIcon?.ShowBalloonTip(3000, "업데이트 실패", "버전 정보가 제공되지 않았습니다.", ToolTipIcon.Warning);
+                    SendStatusResponse("error", "Version not provided in MQTT command");
                     return;
                 }
 
                 string currentExePath = System.Reflection.Assembly.GetExecutingAssembly().Location.Replace(".dll", ".exe");
-                string versionFile = _config.LauncherVersionFile ??
+                string versionFile = _config?.LauncherVersionFile ??
                     Path.Combine(Path.GetDirectoryName(ConfigManager.GetConfigFilePath()) ?? "", "launcher_version.txt");
 
-                var versionChecker = new VersionChecker(_config.LauncherUpdateUrl, versionFile);
-                var versionResult = await versionChecker.CheckVersionAsync();
-
-                if (versionResult.IsUpdateRequired && !string.IsNullOrEmpty(versionResult.DownloadUrl))
-                {
-                    _notifyIcon?.ShowBalloonTip(3000, "업데이트 발견", $"새 버전 {versionResult.RemoteVersion} 다운로드 중...", ToolTipIcon.Info);
-                    await UpdateLauncherAsync(versionResult.DownloadUrl, versionResult.RemoteVersion, currentExePath, versionFile);
-                }
-                else
-                {
-                    _notifyIcon?.ShowBalloonTip(3000, "업데이트 없음", "이미 최신 버전을 사용 중입니다.", ToolTipIcon.Info);
-                    SendStatusResponse("up_to_date", $"Already on latest version: {versionResult.LocalVersion}");
-                }
+                _notifyIcon?.ShowBalloonTip(3000, "업데이트 발견", $"새 버전 {command.Version} 다운로드 중...", ToolTipIcon.Info);
+                await UpdateLauncherAsync(command.DownloadUrl, command.Version, currentExePath, versionFile);
             }
             catch (Exception ex)
             {
@@ -555,52 +504,6 @@ namespace AppLauncher.Features.TrayApp
             }
         }
 
-        private async void CheckLauncherUpdate(object? sender, EventArgs e)
-        {
-            try
-            {
-                if (_config == null || string.IsNullOrWhiteSpace(_config.LauncherUpdateUrl))
-                {
-                    _notifyIcon?.ShowBalloonTip(3000, "업데이트 확인", "런처 업데이트 URL이 설정되지 않았습니다.", ToolTipIcon.Info);
-                    return;
-                }
-
-                UpdateTrayStatus("런처 업데이트 확인 중...");
-                _notifyIcon?.ShowBalloonTip(2000, "업데이트 확인", "런처 업데이트를 확인하는 중입니다...", ToolTipIcon.Info);
-
-                string currentExePath = System.Reflection.Assembly.GetExecutingAssembly().Location.Replace(".dll", ".exe");
-                string versionFile = _config.LauncherVersionFile ??
-                    Path.Combine(Path.GetDirectoryName(ConfigManager.GetConfigFilePath()) ?? "", "launcher_version.txt");
-
-                var versionChecker = new VersionChecker(_config.LauncherUpdateUrl, versionFile);
-                var versionResult = await versionChecker.CheckVersionAsync();
-
-                if (versionResult.IsUpdateRequired && !string.IsNullOrEmpty(versionResult.DownloadUrl))
-                {
-                    var result = System.Windows.MessageBox.Show(
-                        $"새로운 런처 버전이 있습니다.\n\n현재 버전: {versionResult.LocalVersion}\n새 버전: {versionResult.RemoteVersion}\n\n업데이트하시겠습니까?\n\n업데이트 후 런처가 자동으로 재시작됩니다.",
-                        "런처 업데이트",
-                        MessageBoxButton.YesNo,
-                        MessageBoxImage.Question
-                    );
-
-                    if (result == MessageBoxResult.Yes)
-                    {
-                        await UpdateLauncherAsync(versionResult.DownloadUrl, versionResult.RemoteVersion, currentExePath, versionFile);
-                    }
-                }
-                else
-                {
-                    _notifyIcon?.ShowBalloonTip(3000, "업데이트 확인", "최신 버전을 사용 중입니다.", ToolTipIcon.Info);
-                    UpdateTrayStatus("최신 버전 사용 중");
-                }
-            }
-            catch (Exception ex)
-            {
-                _notifyIcon?.ShowBalloonTip(5000, "업데이트 오류", $"업데이트 확인 실패: {ex.Message}", ToolTipIcon.Error);
-                UpdateTrayStatus("업데이트 확인 실패");
-            }
-        }
 
         private async Task UpdateLauncherAsync(string downloadUrl, string newVersion, string currentExePath, string versionFile)
         {
@@ -647,40 +550,34 @@ namespace AppLauncher.Features.TrayApp
             }
         }
 
-        private void UnregisterFromStartup(object? sender, EventArgs e)
-        {
-            var result = System.Windows.MessageBox.Show(
-                "시작프로그램 등록을 해제하시겠습니까?",
-                "등록 해제",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
 
-            if (result == MessageBoxResult.Yes)
+
+        private async void Exit(object? sender, EventArgs e)
+        {
+            try
             {
-                bool success = TaskSchedulerManager.UnregisterTask();
+                UpdateTrayStatus("종료 중...");
 
-                if (success)
+                // MQTT 연결 해제
+                if (_mqttService != null && _mqttService.IsConnected)
                 {
-                    System.Windows.MessageBox.Show(
-                        "시작프로그램 등록이 해제되었습니다.",
-                        "완료",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
+                    UpdateTrayStatus("MQTT 연결 해제 중...");
+                    await _mqttService.DisconnectAsync();
+                    await Task.Delay(500); // MQTT 연결 해제 대기
                 }
-                else
-                {
-                    System.Windows.MessageBox.Show(
-                        "등록 해제에 실패했습니다.\n관리자 권한으로 실행해주세요.",
-                        "실패",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Error);
-                }
+
+                // 리소스 정리
+                Dispose();
+
+                // 잠시 대기 후 종료
+                await Task.Delay(300);
+                Application.Current.Shutdown();
             }
-        }
-
-        private void Exit(object? sender, EventArgs e)
-        {
-            Application.Current.Shutdown();
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"종료 중 오류: {ex.Message}");
+                Application.Current.Shutdown();
+            }
         }
 
         /// <summary>

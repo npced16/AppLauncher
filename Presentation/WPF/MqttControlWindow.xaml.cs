@@ -202,6 +202,67 @@ namespace AppLauncher.Presentation.WPF
             }
         }
 
+        private async void ReconnectButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_mqttService == null)
+            {
+                AddLog("❌ MQTT 서비스가 초기화되지 않았습니다.");
+                return;
+            }
+
+            try
+            {
+                ReconnectButton.IsEnabled = false;
+                AddLog("MQTT 재연결 시도 중...");
+
+                // 연결 해제
+                if (_mqttService.IsConnected)
+                {
+                    await _mqttService.DisconnectAsync();
+                    await Task.Delay(500);
+                }
+
+                // 재연결
+                await _mqttService.ConnectAsync();
+
+                AddLog("✅ MQTT 재연결 성공!");
+            }
+            catch (Exception ex)
+            {
+                AddLog($"❌ 재연결 실패: {ex.Message}");
+            }
+            finally
+            {
+                ReconnectButton.IsEnabled = true;
+            }
+        }
+
+        private void SettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var settingsWindow = new MqttSettingsWindow();
+                settingsWindow.Owner = this;
+                settingsWindow.ShowDialog();
+
+                // 설정이 변경되었을 수 있으므로 다시 로드
+                var config = ConfigManager.LoadConfig();
+                _settings = config.MqttSettings;
+
+                if (_settings != null)
+                {
+                    BrokerInfoText.Text = $"브로커: {_settings.Broker}:{_settings.Port}";
+                    ClientIdText.Text = $"클라이언트 ID: {_settings.ClientId}";
+                    TopicText.Text = $"구독 토픽: {_settings.Topic}";
+                    AddLog("설정이 업데이트되었습니다. 재연결이 필요할 수 있습니다.");
+                }
+            }
+            catch (Exception ex)
+            {
+                AddLog($"❌ 설정 창 오류: {ex.Message}");
+            }
+        }
+
         private void ClearLogButton_Click(object sender, RoutedEventArgs e)
         {
             LogTextBox.Text = "로그가 여기에 표시됩니다...";
