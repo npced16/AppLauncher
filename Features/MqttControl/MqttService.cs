@@ -17,6 +17,7 @@ namespace AppLauncher.Features.MqttControl
     {
         private IMqttClient? _mqttClient;
         private readonly MqttSettings _settings;
+        private readonly string _clientId;
         private bool _isConnected;
 
         /// <summary>
@@ -38,9 +39,27 @@ namespace AppLauncher.Features.MqttControl
 
         public string LastError { get; private set; } = "";
 
-        public MqttService(MqttSettings settings)
+        public string ClientId => _clientId;
+
+        /// <summary>
+        /// 명령 수신 토픽 (device/{deviceId}/commands)
+        /// </summary>
+        public string CommandTopic => $"device/{_clientId}/commands";
+
+        /// <summary>
+        /// 상태 발행 토픽 (device/{deviceId}/status)
+        /// </summary>
+        public string StatusTopic => $"device/{_clientId}/status";
+
+        /// <summary>
+        /// 응답 발행 토픽 (device/{deviceId}/response)
+        /// </summary>
+        public string ResponseTopic => $"device/{_clientId}/response";
+
+        public MqttService(MqttSettings settings, string clientId)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+            _clientId = clientId ?? throw new ArgumentNullException(nameof(clientId));
         }
 
         /// <summary>
@@ -76,16 +95,11 @@ namespace AppLauncher.Features.MqttControl
 
                         var optionsBuilder = new MqttClientOptionsBuilder()
                             .WithTcpServer(_settings.Broker, _settings.Port)
-                            .WithClientId(_settings.ClientId)
+                            .WithClientId(_clientId)
                             .WithCleanSession(false)
                             .WithKeepAlivePeriod(TimeSpan.FromSeconds(60))
                             .WithTimeout(TimeSpan.FromSeconds(10))
                             .WithProtocolVersion(version);
-
-                        if (!string.IsNullOrEmpty(_settings.Username))
-                        {
-                            optionsBuilder = optionsBuilder.WithCredentials(_settings.Username, "");
-                        }
 
                         var options = optionsBuilder.Build();
                         result = await _mqttClient.ConnectAsync(options, CancellationToken.None);
@@ -125,11 +139,11 @@ namespace AppLauncher.Features.MqttControl
                 LogMessage?.Invoke($"사용된 MQTT 프로토콜 버전: {usedVersion}");
 
                 var subscribeOptions = factory.CreateSubscribeOptionsBuilder()
-                    .WithTopicFilter(f => f.WithTopic(_settings.Topic))
+                    .WithTopicFilter(f => f.WithTopic(CommandTopic))
                     .Build();
 
                 await _mqttClient.SubscribeAsync(subscribeOptions, CancellationToken.None);
-                LogMessage?.Invoke($"토픽 구독 완료: {_settings.Topic}");
+                LogMessage?.Invoke($"토픽 구독 완료: {CommandTopic}");
             }
             catch (Exception ex)
             {
@@ -178,7 +192,11 @@ namespace AppLauncher.Features.MqttControl
         /// </summary>
         public async Task PublishJsonAsync<T>(string topic, T data)
         {
-            string json = JsonConvert.SerializeObject(data);
+            string json = JsonConvert.SerializeObject(data, Formatting.Indented);
+
+            LogMessage?.Invoke($"[메시지 발행] 토픽: {topic}");
+            LogMessage?.Invoke($"  내용: {json}");
+
             await PublishAsync(topic, json);
         }
 
@@ -269,3 +287,5 @@ namespace AppLauncher.Features.MqttControl
         public string? Version { get; set; }
     }
 }
+
+

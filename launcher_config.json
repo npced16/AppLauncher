@@ -1,13 +1,11 @@
 {
-  "targetExecutable": "C:\\Windows\\System32\\notepad.exe",
+  "targetExecutable": "C:\\Program Files (x86)\\HBOT Operator\\HBOT Operator.exe",
   "workingDirectory": "",
-  "versionCheckUrl": "",
   "localVersionFile": "version.txt",
   "mqttSettings": {
     "broker": "server3.ibexserver.com",
     "port": 1883,
-    "clientId": "AppLauncher",
     "topic": "applauncher/commands",
-    "chamberName": ""
+    "location": ""
   }
 }
