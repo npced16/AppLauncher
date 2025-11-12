@@ -178,6 +178,22 @@ namespace AppLauncher.Features.MqttControl
                 throw new InvalidOperationException("MQTT 클라이언트가 연결되어 있지 않습니다.");
             }
 
+            // 송신 메시지 로그 출력 (JSON 형태로)
+            LogMessage?.Invoke($"[메시지 송신] 토픽: {topic}");
+
+            // JSON 파싱 시도 후 예쁘게 출력
+            try
+            {
+                var jsonObj = JsonConvert.DeserializeObject(payload);
+                string formattedJson = JsonConvert.SerializeObject(jsonObj, Formatting.Indented);
+                LogMessage?.Invoke($"  내용 (JSON):\n{formattedJson}");
+            }
+            catch
+            {
+                // JSON이 아닌 경우 원본 그대로 출력
+                LogMessage?.Invoke($"  내용: {payload}");
+            }
+
             var message = new MqttApplicationMessageBuilder()
                 .WithTopic(topic)
                 .WithPayload(payload)
@@ -209,6 +225,22 @@ namespace AppLauncher.Features.MqttControl
                 payloadSequence.CopyTo(payloadBytes);
                 string payload = Encoding.UTF8.GetString(payloadBytes);
 
+                // 수신 메시지 로그 출력 (JSON 형태로)
+                LogMessage?.Invoke($"[메시지 수신] 토픽: {e.ApplicationMessage.Topic}");
+
+                // JSON 파싱 시도 후 예쁘게 출력
+                try
+                {
+                    var jsonObj = JsonConvert.DeserializeObject(payload);
+                    string formattedJson = JsonConvert.SerializeObject(jsonObj, Formatting.Indented);
+                    LogMessage?.Invoke($"  내용:\n{formattedJson}");
+                }
+                catch
+                {
+                    // JSON이 아닌 경우 원본 그대로 출력
+                    LogMessage?.Invoke($"  내용: {payload}");
+                }
+
                 var message = new MqttMessage
                 {
                     Topic = e.ApplicationMessage.Topic,
@@ -221,7 +253,7 @@ namespace AppLauncher.Features.MqttControl
             catch (Exception ex)
             {
                 // 로깅 또는 에러 처리
-                Console.WriteLine($"메시지 처리 오류: {ex.Message}");
+                LogMessage?.Invoke($"메시지 처리 오류: {ex.Message}");
             }
 
             return Task.CompletedTask;
@@ -270,22 +302,13 @@ namespace AppLauncher.Features.MqttControl
         [JsonProperty("command")]
         public string Command { get; set; } = "";
 
-        [JsonProperty("executable")]
-        public string? Executable { get; set; }
+        [JsonProperty("url")]
+        public string? URL { get; set; }
 
-        [JsonProperty("downloadUrl")]
-        public string? DownloadUrl { get; set; }
-
-        [JsonProperty("workingDirectory")]
-        public string? WorkingDirectory { get; set; }
-
-        [JsonProperty("arguments")]
-        public string? Arguments { get; set; }
-
-        // 업데이트 명령용 필드
         [JsonProperty("version")]
         public string? Version { get; set; }
+
+        [JsonProperty("timestamp")]
+        public string? TimeStamp { get; set; }
     }
 }
-
-

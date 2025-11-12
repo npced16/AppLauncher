@@ -9,6 +9,9 @@
     <ApplicationIcon>app_icon.ico</ApplicationIcon>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
 
+    <!-- CA1416 경고 억제 (Windows 전용 앱) -->
+    <NoWarn>CA1416</NoWarn>
+
     <!-- Self-contained 빌드 크기 최적화 (WinForms 전용) -->
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>

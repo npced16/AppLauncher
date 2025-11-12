@@ -16,6 +16,7 @@ namespace AppLauncher.Presentation.WinForms
 
         private Button browseExecutableButton;
         private Button browseDirectoryButton;
+        private Button resetButton;
         private Button saveButton;
         private Button cancelButton;
 
@@ -105,6 +106,16 @@ namespace AppLauncher.Presentation.WinForms
                 Text = "version.txt"
             };
             this.Controls.Add(localVersionFileTextBox);
+
+            // Reset Button
+            resetButton = new Button
+            {
+                Text = "기본값 초기화",
+                Location = new Point(20, 250),
+                Size = new Size(120, 35)
+            };
+            resetButton.Click += ResetButton_Click;
+            this.Controls.Add(resetButton);
 
             // Save Button
             saveButton = new Button
@@ -231,6 +242,33 @@ namespace AppLauncher.Presentation.WinForms
             catch (Exception ex)
             {
                 MessageBox.Show($"설정 저장 실패: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void ResetButton_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                var result = MessageBox.Show(
+                    "모든 설정을 기본값으로 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
+                    "기본값 초기화",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning);
+
+                if (result == DialogResult.Yes)
+                {
+                    // 기본값으로 초기화
+                    ConfigManager.ResetToDefault();
+
+                    // 설정 다시 로드
+                    LoadSettings();
+
+                    MessageBox.Show("설정이 기본값으로 초기화되었습니다.", "초기화 완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"초기화 실패: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }

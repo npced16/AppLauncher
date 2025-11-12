@@ -80,13 +80,27 @@ namespace AppLauncher.Shared.Configuration
             return GetAppDataConfigPath();
         }
 
+        /// <summary>
+        /// 설정을 기본값으로 초기화
+        /// </summary>
+        public static void ResetToDefault()
+        {
+            var defaultConfig = CreateDefaultConfig();
+            SaveConfig(defaultConfig);
+        }
+
         private static LauncherConfig CreateDefaultConfig()
         {
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string appFolder = Path.Combine(appDataPath, AppName);
+
             return new LauncherConfig
             {
                 TargetExecutable = @"C:\Program Files (x86)\\HBOT Operator\HBOT Operator.exe",
                 WorkingDirectory = "", // 비워두면 실행 파일 디렉토리를 자동으로 사용
-                LocalVersionFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "version.txt"),
+                LocalVersionFile = Path.Combine(baseDir, "labview_version.txt"),  // LabView 버전 (실행 파일 옆)
+                LauncherVersionFile = Path.Combine(appFolder, "launcher_version.txt"),  // 런처 버전 (AppData)
                 MqttSettings = new MqttSettings
                 {
                     Broker = "localhost",
@@ -112,14 +126,14 @@ namespace AppLauncher.Shared.Configuration
 
 
         /// <summary>
-        /// 로컬 버전 파일 경로
+        /// LabView/대상 앱 버전 파일 경로 (labview_version.txt)
         /// </summary>
         [JsonProperty("localVersionFile")]
         public string LocalVersionFile { get; set; } = "";
 
 
         /// <summary>
-        /// 런처 버전 파일 경로
+        /// 런처 자체의 버전 파일 경로 (launcher_version.txt)
         /// </summary>
         [JsonProperty("launcherVersionFile")]
         public string? LauncherVersionFile { get; set; }

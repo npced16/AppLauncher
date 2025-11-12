@@ -17,11 +17,13 @@ namespace AppLauncher.Features.TrayApp
     public class TrayApplicationContext : ApplicationContext
     {
         private NotifyIcon? _notifyIcon;
+        private MainForm? _mainForm;
         private MqttControlForm? _mqttControlForm;
         private LauncherSettingsForm? _launcherSettingsForm;
         private MqttService? _mqttService;
         private MqttMessageHandler? _mqttMessageHandler;
         private LauncherConfig? _config;
+        private ToolStripMenuItem? _installStatusMenuItem;
 
         public TrayApplicationContext()
         {
@@ -31,25 +33,38 @@ namespace AppLauncher.Features.TrayApp
 
         private void InitializeTrayIcon()
         {
-            // 아이콘 파일 로드
+            // 아이콘 파일 로드 - 실행 파일에서 아이콘 추출 (가장 안전)
             Icon? appIcon = null;
-            string iconPath = System.IO.Path.Combine(
-                AppDomain.CurrentDomain.BaseDirectory,
-                "app_icon.ico"
-            );
 
-            if (System.IO.File.Exists(iconPath))
+            try
             {
+                // 먼저 실행 파일의 아이콘 사용 시도
+                string exePath = Environment.ProcessPath ?? System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                if (!string.IsNullOrEmpty(exePath))
+                {
+                    appIcon = Icon.ExtractAssociatedIcon(exePath);
+                }
+            }
+            catch
+            {
+                // 실행 파일 아이콘 추출 실패시 파일에서 로드 시도
                 try
                 {
-                    appIcon = new Icon(iconPath);
+                    string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app_icon.ico");
+                    if (File.Exists(iconPath))
+                    {
+                        appIcon = new Icon(iconPath);
+                    }
                 }
                 catch
                 {
+                    // 최종 대안으로 시스템 아이콘 사용
                     appIcon = SystemIcons.Application;
                 }
             }
-            else
+
+            // 아이콘이 여전히 null이면 시스템 아이콘 사용
+            if (appIcon == null)
             {
                 appIcon = SystemIcons.Application;
             }
@@ -64,6 +79,12 @@ namespace AppLauncher.Features.TrayApp
             // 컨텍스트 메뉴 생성
             var contextMenu = new ContextMenuStrip();
 
+            var mainFormMenuItem = new ToolStripMenuItem("앱 실행");
+            mainFormMenuItem.Click += ShowMainForm;
+            contextMenu.Items.Add(mainFormMenuItem);
+
+            contextMenu.Items.Add(new ToolStripSeparator());
+
             var launcherSettingsMenuItem = new ToolStripMenuItem("런처 설정");
             launcherSettingsMenuItem.Click += ShowLauncherSettingsWindow;
             contextMenu.Items.Add(launcherSettingsMenuItem);
@@ -71,6 +92,18 @@ namespace AppLauncher.Features.TrayApp
             var mqttControlMenuItem = new ToolStripMenuItem("MQTT 제어 센터");
             mqttControlMenuItem.Click += ShowMqttControlWindow;
             contextMenu.Items.Add(mqttControlMenuItem);
+
+            contextMenu.Items.Add(new ToolStripSeparator());
+
+            // 현재 버전 표시 (비활성화)
+            var versionMenuItem = new ToolStripMenuItem($"버전: {AppLauncher.Shared.VersionInfo.LAUNCHER_VERSION}");
+            versionMenuItem.Enabled = false;
+            contextMenu.Items.Add(versionMenuItem);
+
+            // 설치 상태 메뉴 항목 (평소 비활성화)
+            _installStatusMenuItem = new ToolStripMenuItem("상태: 대기 중");
+            _installStatusMenuItem.Enabled = false;
+            contextMenu.Items.Add(_installStatusMenuItem);
 
             contextMenu.Items.Add(new ToolStripSeparator());
 
@@ -129,7 +162,7 @@ namespace AppLauncher.Features.TrayApp
                     _mqttService,
                     _config,
                     UpdateTrayStatus,
-                    ShowBalloonTip
+                    UpdateInstallStatus
                 );
 
                 // 이벤트 핸들러 등록
@@ -194,11 +227,6 @@ namespace AppLauncher.Features.TrayApp
             }
         }
 
-        private void ShowBalloonTip(string title, string message, ToolTipIcon icon)
-        {
-            _notifyIcon?.ShowBalloonTip(3000, title, message, icon);
-        }
-
         private void UpdateTrayStatus(string message)
         {
             if (_notifyIcon != null)
@@ -206,6 +234,44 @@ namespace AppLauncher.Features.TrayApp
                 // NotifyIcon.Text는 최대 63자까지만 지원
                 var truncatedMessage = message.Length > 63 ? message.Substring(0, 60) + "..." : message;
                 _notifyIcon.Text = $"App Launcher - {truncatedMessage}";
+            }
+        }
+
+        private void UpdateInstallStatus(string status)
+        {
+            if (_installStatusMenuItem != null)
+            {
+                // UI 스레드에서 실행되도록 보장
+                if (_installStatusMenuItem.GetCurrentParent()?.InvokeRequired == true)
+                {
+                    _installStatusMenuItem.GetCurrentParent().Invoke(new Action(() =>
+                    {
+                        _installStatusMenuItem.Text = $"상태: {status}";
+                        _installStatusMenuItem.Enabled = status != "대기 중";
+                    }));
+                }
+                else
+                {
+                    _installStatusMenuItem.Text = $"상태: {status}";
+                    _installStatusMenuItem.Enabled = status != "대기 중";
+                }
+            }
+        }
+
+        private void ShowMainForm(object? sender, EventArgs e)
+        {
+            if (_mainForm == null || _mainForm.IsDisposed)
+            {
+                _mainForm = new MainForm();
+                _mainForm.FormClosed += (s, args) =>
+                {
+                    _mainForm = null;
+                };
+                _mainForm.Show();
+            }
+            else
+            {
+                _mainForm.Activate();
             }
         }
 

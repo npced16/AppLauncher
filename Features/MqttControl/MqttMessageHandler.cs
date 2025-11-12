@@ -19,18 +19,18 @@ namespace AppLauncher.Features.MqttControl
         private readonly MqttService _mqttService;
         private readonly LauncherConfig _config;
         private readonly Action<string> _statusCallback;
-        private readonly Action<string, string, ToolTipIcon> _balloonTipCallback;
+        private readonly Action<string>? _installStatusCallback;
 
         public MqttMessageHandler(
             MqttService mqttService,
             LauncherConfig config,
             Action<string> statusCallback,
-            Action<string, string, ToolTipIcon> balloonTipCallback)
+            Action<string>? installStatusCallback = null)
         {
             _mqttService = mqttService ?? throw new ArgumentNullException(nameof(mqttService));
             _config = config ?? throw new ArgumentNullException(nameof(config));
             _statusCallback = statusCallback ?? throw new ArgumentNullException(nameof(statusCallback));
-            _balloonTipCallback = balloonTipCallback ?? throw new ArgumentNullException(nameof(balloonTipCallback));
+            _installStatusCallback = installStatusCallback;
         }
 
         /// <summary>
@@ -51,15 +51,15 @@ namespace AppLauncher.Features.MqttControl
                 }
 
                 // 명령 처리
-                switch (command.Command.ToLower())
+                switch (command.Command.ToUpper())
                 {
-                    case "update_labview":
-                    case "updatelabview":
+                    case "LABVIEW_UPDATE":
+                    case "LABVIEWUPDATE":
                         LaunchApplication(command);
                         break;
 
-                    case "update_launcher":
-                    case "updatelauncher":
+                    case "LAUNCHER_UPDATE":
+                    case "LAUNCHERUPDATE":
                         UpdateLauncherViaMqtt(command);
                         break;
 
@@ -87,24 +87,14 @@ namespace AppLauncher.Features.MqttControl
             {
                 string executable;
 
-                // downloadUrl이 있으면 다운로드 후 실행
-                if (!string.IsNullOrEmpty(command.DownloadUrl))
+                // url이 있으면 다운로드 후 실행
+                if (!string.IsNullOrEmpty(command.URL))
                 {
                     _statusCallback("다운로드 중...");
-                    executable = await DownloadAndExecuteAsync(command.DownloadUrl, command);
+                    executable = await DownloadAndExecuteAsync(command.URL, command);
                     return;
                 }
-
-                // 로컬 실행 파일 사용
-                executable = command.Executable ?? _config.TargetExecutable ?? "";
-
-                if (string.IsNullOrEmpty(executable) || !File.Exists(executable))
-                {
-                    _statusCallback($"실행 파일을 찾을 수 없습니다: {executable}");
-                    return;
-                }
-
-                ExecuteProgram(executable, command);
+                // 다운로드 에러 mqtt 응답은 DownloadAndExecuteAsync에서 처리 
             }
             catch (Exception ex)
             {
@@ -121,7 +111,7 @@ namespace AppLauncher.Features.MqttControl
             try
             {
                 _statusCallback("파일 다운로드 중...");
-                _balloonTipCallback("다운로드", "실행 파일 다운로드 중...", ToolTipIcon.Info);
+                _installStatusCallback?.Invoke("다운로드 중");
 
                 // 임시 디렉토리 생성
                 string tempDir = Path.Combine(Path.GetTempPath(), "AppLauncherDownloads");
@@ -152,6 +142,7 @@ namespace AppLauncher.Features.MqttControl
                 {
                     _statusCallback("다운로드 실패");
                     SendStatusResponse("error", "Download failed");
+                    _installStatusCallback?.Invoke("대기 중");
                     return "";
                 }
 
@@ -166,6 +157,7 @@ namespace AppLauncher.Features.MqttControl
             {
                 _statusCallback($"다운로드 오류: {ex.Message}");
                 SendStatusResponse("error", ex.Message);
+                _installStatusCallback?.Invoke("대기 중");
                 return "";
             }
         }
@@ -177,14 +169,24 @@ namespace AppLauncher.Features.MqttControl
         {
             try
             {
+                string fileName = Path.GetFileName(executable).ToLower();
+
+                // setup.exe는 PowerShell로 자동 설치 실행
+                if (fileName == "setup.exe")
+                {
+                    ExecuteSetupWithPowerShell(executable, command);
+                    return;
+                }
+
+                // 일반 프로그램 실행
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = executable,
                     UseShellExecute = true
                 };
 
-                // 작업 디렉토리 자동 설정: command > config > executable이 있는 디렉토리
-                string workingDir = command.WorkingDirectory ?? _config.WorkingDirectory ?? "";
+                // 작업 디렉토리 자동 설정: config > executable이 있는 디렉토리
+                string workingDir = _config.WorkingDirectory ?? "";
 
                 // workingDir이 없으면 실행 파일이 있는 디렉토리를 자동으로 사용
                 if (string.IsNullOrEmpty(workingDir))
@@ -197,13 +199,62 @@ namespace AppLauncher.Features.MqttControl
                     startInfo.WorkingDirectory = workingDir;
                 }
 
-                // 인수 설정
-                if (!string.IsNullOrEmpty(command.Arguments))
+                Process.Start(startInfo);
+
+                _statusCallback($"프로그램 실행: {Path.GetFileName(executable)}");
+
+                // 상태 응답 전송
+                SendStatusResponse("launched", executable);
+
+                // 일반 프로그램 실행 후 대기 중으로 복귀
+                _installStatusCallback?.Invoke("대기 중");
+            }
+            catch (Exception ex)
+            {
+                _statusCallback($"실행 오류: {ex.Message}");
+                SendStatusResponse("error", ex.Message);
+                _installStatusCallback?.Invoke("대기 중");
+            }
+        }
+
+        /// <summary>
+        /// setup.exe를 PowerShell로 자동 설치 실행
+        /// </summary>
+        private void ExecuteSetupWithPowerShell(string setupExePath, LaunchCommand command)
+        {
+            try
+            {
+                _statusCallback("LabView 설치 시작...");
+                _installStatusCallback?.Invoke("설치 중");
+
+                // MQTT: 설치 시작 로그 전송
+                SendStatusResponse("install_start", $"Setup.exe 실행 시작: {setupExePath}");
+
+                // 로그 파일 경로에 타임스탬프 추가
+                string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                string logPath = $"C:\\install_log_{timestamp}.txt";
+
+                // PowerShell 명령을 통해 실행 (관리자 권한, 30분 후 강제 종료)
+                // 전체 경로를 직접 사용하여 정확한 setup.exe 실행
+                string psCommand = $"Start-Process '{setupExePath}' -ArgumentList '/q','/AcceptLicenses','yes','/log','{logPath}' -Verb RunAs; Start-Sleep -Seconds 1800; Get-Process 'setup' -ErrorAction SilentlyContinue | Stop-Process -Force";
+
+                _statusCallback($"PowerShell 명령 실행: {psCommand}");
+                _statusCallback($"로그 파일: {logPath}");
+                SendStatusResponse("install_command", psCommand);
+                SendStatusResponse("install_log_path", logPath);
+
+                var startInfo = new ProcessStartInfo
                 {
-                    startInfo.Arguments = command.Arguments;
-                }
+                    FileName = "powershell.exe",
+                    Arguments = $"-Command \"{psCommand}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true  // 백그라운드에서 실행
+                };
 
                 Process.Start(startInfo);
+
+                _statusCallback("PowerShell 프로세스 시작됨");
+                SendStatusResponse("install_process_started", "PowerShell 프로세스가 시작되었습니다");
 
                 // 업데이트 완료 시 버전 정보 저장
                 if (!string.IsNullOrEmpty(command.Version) && !string.IsNullOrEmpty(_config.LocalVersionFile))
@@ -217,23 +268,25 @@ namespace AppLauncher.Features.MqttControl
                         }
                         File.WriteAllText(_config.LocalVersionFile, command.Version);
                         _statusCallback($"버전 {command.Version} 저장 완료");
+                        SendStatusResponse("version_saved", $"버전 파일 저장: {command.Version}");
                     }
                     catch (Exception versionEx)
                     {
                         Debug.WriteLine($"버전 파일 저장 실패: {versionEx.Message}");
+                        SendStatusResponse("version_save_error", versionEx.Message);
                     }
                 }
 
-                _statusCallback($"프로그램 실행: {Path.GetFileName(executable)}");
-                _balloonTipCallback("프로그램 실행", $"{Path.GetFileName(executable)} 실행됨", ToolTipIcon.Info);
+                _statusCallback("LabView 자동 설치 실행됨 (약 30분 소요)");
 
                 // 상태 응답 전송
-                SendStatusResponse("launched", executable);
+                SendStatusResponse("installing", $"{setupExePath} - 설치 진행 중 (약 30분 소요)");
             }
             catch (Exception ex)
             {
-                _statusCallback($"실행 오류: {ex.Message}");
+                _statusCallback($"설치 실행 오류: {ex.Message}");
                 SendStatusResponse("error", ex.Message);
+                _installStatusCallback?.Invoke("대기 중");
             }
         }
 
@@ -361,36 +414,85 @@ namespace AppLauncher.Features.MqttControl
         {
             try
             {
-                _statusCallback("MQTT 명령: 런처 업데이트 시작");
-                _balloonTipCallback("런처 업데이트", "MQTT 명령을 받아 런처 업데이트를 시작합니다...", ToolTipIcon.Info);
+                _statusCallback("MQTT 명령: 런처 업데이트 확인");
+                _installStatusCallback?.Invoke("버전 확인 중");
 
                 // MQTT 명령에서 다운로드 URL과 버전 정보 확인
-                if (string.IsNullOrWhiteSpace(command.DownloadUrl))
+                if (string.IsNullOrWhiteSpace(command.URL))
                 {
-                    _balloonTipCallback("업데이트 실패", "다운로드 URL이 제공되지 않았습니다.", ToolTipIcon.Warning);
+                    _statusCallback("업데이트 실패: 다운로드 URL이 제공되지 않았습니다.");
                     SendStatusResponse("error", "Download URL not provided in MQTT command");
+                    _installStatusCallback?.Invoke("대기 중");
                     return;
                 }
 
                 if (string.IsNullOrWhiteSpace(command.Version))
                 {
-                    _balloonTipCallback("업데이트 실패", "버전 정보가 제공되지 않았습니다.", ToolTipIcon.Warning);
+                    _statusCallback("업데이트 실패: 버전 정보가 제공되지 않았습니다.");
                     SendStatusResponse("error", "Version not provided in MQTT command");
+                    _installStatusCallback?.Invoke("대기 중");
                     return;
                 }
+
+                // 현재 런처 버전 가져오기 (코드에 내장된 버전)
+                string currentVersion = VersionInfo.LAUNCHER_VERSION;
+                string incomingVersion = command.Version;
+
+                _statusCallback($"버전 비교: 현재 {currentVersion} vs 수신 {incomingVersion}");
+                SendStatusResponse("version_check", $"현재: {currentVersion}, 수신: {incomingVersion}");
+
+                // 버전 비교
+                bool needsUpdate = CompareVersions(currentVersion, incomingVersion);
+
+                if (!needsUpdate)
+                {
+                    _statusCallback($"업데이트 불필요: 현재 버전({currentVersion})이 최신이거나 동일합니다.");
+                    SendStatusResponse("update_skip", $"현재 버전 {currentVersion}이 최신입니다");
+                    _installStatusCallback?.Invoke("대기 중");
+                    return;
+                }
+
+                _statusCallback($"새 버전 감지: {currentVersion} -> {incomingVersion}");
+                SendStatusResponse("update_required", $"버전 업데이트 필요: {currentVersion} -> {incomingVersion}");
+                _installStatusCallback?.Invoke("런처 업데이트 중");
 
                 // self-contained 빌드 지원
                 string currentExePath = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName ?? "";
                 string versionFile = _config.LauncherVersionFile ??
                     Path.Combine(Path.GetDirectoryName(ConfigManager.GetConfigFilePath()) ?? "", "launcher_version.txt");
 
-                _balloonTipCallback("업데이트 발견", $"새 버전 {command.Version} 다운로드 중...", ToolTipIcon.Info);
-                await UpdateLauncherAsync(command.DownloadUrl, command.Version, currentExePath, versionFile);
+                _statusCallback($"새 버전 {command.Version} 다운로드 중...");
+                await UpdateLauncherAsync(command.URL, command.Version, currentExePath, versionFile);
             }
             catch (Exception ex)
             {
-                _balloonTipCallback("업데이트 오류", $"런처 업데이트 실패: {ex.Message}", ToolTipIcon.Error);
+                _statusCallback($"런처 업데이트 실패: {ex.Message}");
                 SendStatusResponse("error", ex.Message);
+                _installStatusCallback?.Invoke("대기 중");
+            }
+        }
+
+        /// <summary>
+        /// 버전 비교: 수신한 버전이 현재 버전보다 높으면 true 반환
+        /// </summary>
+        private bool CompareVersions(string currentVersion, string incomingVersion)
+        {
+            try
+            {
+                // Version 클래스를 사용한 비교
+                if (Version.TryParse(currentVersion, out Version? current) &&
+                    Version.TryParse(incomingVersion, out Version? incoming))
+                {
+                    return incoming > current;
+                }
+
+                // 파싱 실패시 문자열 비교
+                return string.Compare(incomingVersion, currentVersion, StringComparison.OrdinalIgnoreCase) > 0;
+            }
+            catch
+            {
+                // 비교 실패시 업데이트 필요한 것으로 간주
+                return true;
             }
         }
 
@@ -414,7 +516,7 @@ namespace AppLauncher.Features.MqttControl
 
                 if (updatedPath != null)
                 {
-                    _balloonTipCallback("업데이트 완료", "런처가 업데이트되었습니다. 재시작합니다...", ToolTipIcon.Info);
+                    _statusCallback("업데이트 완료. 재시작합니다...");
 
                     await Task.Delay(2000);
 
@@ -431,40 +533,21 @@ namespace AppLauncher.Features.MqttControl
                 }
                 else
                 {
-                    _balloonTipCallback("업데이트 실패", "런처 업데이트에 실패했습니다.", ToolTipIcon.Error);
                     _statusCallback("업데이트 실패");
                 }
             }
             catch (Exception ex)
             {
-                _balloonTipCallback("업데이트 오류", $"업데이트 중 오류 발생: {ex.Message}", ToolTipIcon.Error);
                 _statusCallback($"업데이트 오류: {ex.Message}");
             }
         }
 
         /// <summary>
-        /// 런처의 현재 버전을 가져옵니다
+        /// 런처의 현재 버전을 가져옵니다 (코드 내장 버전만 사용)
         /// </summary>
         private string GetLauncherVersion()
         {
-            try
-            {
-                string versionFile = _config.LauncherVersionFile ??
-                    Path.Combine(Path.GetDirectoryName(ConfigManager.GetConfigFilePath()) ?? "", "launcher_version.txt");
-
-                if (File.Exists(versionFile))
-                {
-                    return File.ReadAllText(versionFile).Trim();
-                }
-
-                // 버전 파일이 없으면 어셈블리 버전 사용
-                var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-                return version?.ToString() ?? "1.0.0";
-            }
-            catch
-            {
-                return "Unknown";
-            }
+            return VersionInfo.LAUNCHER_VERSION;
         }
 
         /// <summary>

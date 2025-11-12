@@ -262,7 +262,20 @@ namespace AppLauncher.Presentation.WinForms
         private void OnMessageReceived(MqttMessage message)
         {
             AddLog($"[메시지 수신] 토픽: {message.Topic}");
-            AddLog($"  내용: {message.Payload}");
+
+            // JSON 파싱 시도 후 예쁘게 출력
+            try
+            {
+                var jsonObj = Newtonsoft.Json.JsonConvert.DeserializeObject(message.Payload);
+                string formattedJson = Newtonsoft.Json.JsonConvert.SerializeObject(jsonObj, Newtonsoft.Json.Formatting.Indented);
+                AddLog($"  내용 (JSON):");
+                AddLog(formattedJson);
+            }
+            catch
+            {
+                // JSON이 아닌 경우 원본 그대로 출력
+                AddLog($"  내용: {message.Payload}");
+            }
         }
 
         private void AddLog(string message)

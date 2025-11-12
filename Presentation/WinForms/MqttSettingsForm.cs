@@ -13,7 +13,6 @@ namespace AppLauncher.Presentation.WinForms
         private Label brokerLabel;
         private Label portLabel;
         private Label clientIdLabel;
-        private Label locationLabel;
         private TextBox locationTextBox;
         private Button saveButton;
         private Button cancelButton;
