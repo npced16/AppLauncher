@@ -3,46 +3,46 @@ using System.Diagnostics;
 
 namespace AppLauncher.Shared
 {
-    public class TaskSchedulerManager
+  public class TaskSchedulerManager
+  {
+    private const string TASK_NAME = "AppLauncher_Startup";
+
+    /// <summary>
+    /// 작업 스케줄러에 등록되어 있는지 확인
+    /// </summary>
+    public static bool IsTaskRegistered()
     {
-        private const string TASK_NAME = "AppLauncher_Startup";
-
-        /// <summary>
-        /// 작업 스케줄러에 등록되어 있는지 확인
-        /// </summary>
-        public static bool IsTaskRegistered()
+      try
+      {
+        var startInfo = new ProcessStartInfo
         {
-            try
-            {
-                var startInfo = new ProcessStartInfo
-                {
-                    FileName = "schtasks.exe",
-                    Arguments = $"/Query /TN \"{TASK_NAME}\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true
-                };
+          FileName = "schtasks.exe",
+          Arguments = $"/Query /TN \"{TASK_NAME}\"",
+          UseShellExecute = false,
+          CreateNoWindow = true,
+          RedirectStandardOutput = true,
+          RedirectStandardError = true
+        };
 
-                using var process = Process.Start(startInfo);
-                process?.WaitForExit();
-                return process?.ExitCode == 0;
-            }
-            catch
-            {
-                return false;
-            }
-        }
+        using var process = Process.Start(startInfo);
+        process?.WaitForExit();
+        return process?.ExitCode == 0;
+      }
+      catch
+      {
+        return false;
+      }
+    }
 
-        /// <summary>
-        /// 작업 스케줄러에 등록 (로그온 시 자동 실행, 관리자 권한)
-        /// </summary>
-        public static bool RegisterTask(string exePath)
-        {
-            try
-            {
-                // XML 형식으로 작업 생성
-                string xmlTask = $@"<?xml version=""1.0"" encoding=""UTF-16""?>
+    /// <summary>
+    /// 작업 스케줄러에 등록 (로그온 시 자동 실행, 관리자 권한)
+    /// </summary>
+    public static bool RegisterTask(string exePath)
+    {
+      try
+      {
+        // XML 형식으로 작업 생성
+        string xmlTask = $@"<?xml version=""1.0"" encoding=""UTF-16""?>
 <Task version=""1.2"" xmlns=""http://schemas.microsoft.com/windows/2004/02/mit/task"">
   <RegistrationInfo>
     <Description>AppLauncher auto-start with administrator privileges</Description>
@@ -84,65 +84,37 @@ namespace AppLauncher.Shared
   </Actions>
 </Task>";
 
-                // 임시 XML 파일 생성
-                string tempXmlPath = System.IO.Path.GetTempFileName();
-                System.IO.File.WriteAllText(tempXmlPath, xmlTask, System.Text.Encoding.Unicode);
+        // 임시 XML 파일 생성
+        string tempXmlPath = System.IO.Path.GetTempFileName();
+        System.IO.File.WriteAllText(tempXmlPath, xmlTask, System.Text.Encoding.Unicode);
 
-                try
-                {
-                    var startInfo = new ProcessStartInfo
-                    {
-                        FileName = "schtasks.exe",
-                        Arguments = $"/Create /TN \"{TASK_NAME}\" /XML \"{tempXmlPath}\" /F",
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true
-                    };
-
-                    using var process = Process.Start(startInfo);
-                    process?.WaitForExit();
-
-                    return process?.ExitCode == 0;
-                }
-                finally
-                {
-                    // 임시 파일 삭제
-                    try { System.IO.File.Delete(tempXmlPath); } catch { }
-                }
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// 작업 스케줄러에서 삭제
-        /// </summary>
-        public static bool UnregisterTask()
+        try
         {
-            try
-            {
-                var startInfo = new ProcessStartInfo
-                {
-                    FileName = "schtasks.exe",
-                    Arguments = $"/Delete /TN \"{TASK_NAME}\" /F",
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true
-                };
+          var startInfo = new ProcessStartInfo
+          {
+            FileName = "schtasks.exe",
+            Arguments = $"/Create /TN \"{TASK_NAME}\" /XML \"{tempXmlPath}\" /F",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+          };
 
-                using var process = Process.Start(startInfo);
-                process?.WaitForExit();
+          using var process = Process.Start(startInfo);
+          process?.WaitForExit();
 
-                return process?.ExitCode == 0;
-            }
-            catch
-            {
-                return false;
-            }
+          return process?.ExitCode == 0;
         }
+        finally
+        {
+          // 임시 파일 삭제
+          try { System.IO.File.Delete(tempXmlPath); } catch { }
+        }
+      }
+      catch
+      {
+        return false;
+      }
     }
+  }
 }

@@ -191,6 +191,9 @@ namespace AppLauncher.Features.TrayApp
             if (isConnected)
             {
                 UpdateTrayStatus("MQTT 연결됨");
+
+                // 연결 성공 시 초기 상태 전송
+                _mqttMessageHandler?.SendStatus("connected");
             }
             else
             {
@@ -203,28 +206,6 @@ namespace AppLauncher.Features.TrayApp
             // 로그 메시지를 트레이 상태로 업데이트
             UpdateTrayStatus(message);
             System.Diagnostics.Debug.WriteLine($"[MQTT] {message}");
-        }
-
-        public string GetMqttStatus()
-        {
-            if (_mqttService == null)
-            {
-                return "MQTT 미설정";
-            }
-
-            if (_mqttService.IsConnected)
-            {
-                return $"연결됨: {_config?.MqttSettings?.Broker}:{_config?.MqttSettings?.Port}";
-            }
-            else
-            {
-                string status = "연결 끊김";
-                if (!string.IsNullOrEmpty(_mqttService.LastError))
-                {
-                    status += $"\n오류: {_mqttService.LastError}";
-                }
-                return status;
-            }
         }
 
         private void UpdateTrayStatus(string message)
@@ -242,9 +223,10 @@ namespace AppLauncher.Features.TrayApp
             if (_installStatusMenuItem != null)
             {
                 // UI 스레드에서 실행되도록 보장
-                if (_installStatusMenuItem.GetCurrentParent()?.InvokeRequired == true)
+                var parent = _installStatusMenuItem.GetCurrentParent();
+                if (parent?.InvokeRequired == true)
                 {
-                    _installStatusMenuItem.GetCurrentParent().Invoke(new Action(() =>
+                    parent.Invoke(new Action(() =>
                     {
                         _installStatusMenuItem.Text = $"상태: {status}";
                         _installStatusMenuItem.Enabled = status != "대기 중";
@@ -321,6 +303,20 @@ namespace AppLauncher.Features.TrayApp
             {
                 UpdateTrayStatus("종료 중...");
 
+                // 모든 열려있는 폼 닫기
+                if (_mainForm != null && !_mainForm.IsDisposed)
+                {
+                    _mainForm.Close();
+                }
+                if (_mqttControlForm != null && !_mqttControlForm.IsDisposed)
+                {
+                    _mqttControlForm.Close();
+                }
+                if (_launcherSettingsForm != null && !_launcherSettingsForm.IsDisposed)
+                {
+                    _launcherSettingsForm.Close();
+                }
+
                 // MQTT 연결 해제
                 if (_mqttService != null && _mqttService.IsConnected)
                 {
@@ -332,18 +328,22 @@ namespace AppLauncher.Features.TrayApp
                 // 리소스 정리
                 Dispose();
 
-                // 잠시 대기 후 종료
+                // 잠시 대기 후 프로세스 완전 종료
                 await Task.Delay(300);
-                Application.Exit();
+
+                // Application.Exit()는 메시지 루프만 종료하므로
+                // Environment.Exit(0)를 사용하여 프로세스 전체를 종료
+                Environment.Exit(0);
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"종료 중 오류: {ex.Message}");
-                Application.Exit();
+                // 오류 발생 시에도 프로세스 강제 종료
+                Environment.Exit(1);
             }
         }
 
-        public void Dispose()
+        public new void Dispose()
         {
             // MQTT 서비스 정리
             if (_mqttService != null)

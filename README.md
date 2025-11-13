@@ -7,3 +7,10 @@ powershell -Command "Start-Process '.\setup.exe' -ArgumentList '/q','/AcceptLice
 
 
 C:\Users\UK\AppData\Local\Temp\AppLauncherDownloads 설치파일위치
+
+
+배포용 명령어
+dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -p:PublishReadyToRun=false
+
+테스트용 명령어 
+dotnet watch run

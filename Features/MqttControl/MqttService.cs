@@ -209,10 +209,6 @@ namespace AppLauncher.Features.MqttControl
         public async Task PublishJsonAsync<T>(string topic, T data)
         {
             string json = JsonConvert.SerializeObject(data, Formatting.Indented);
-
-            LogMessage?.Invoke($"[메시지 발행] 토픽: {topic}");
-            LogMessage?.Invoke($"  내용: {json}");
-
             await PublishAsync(topic, json);
         }
 
@@ -310,5 +306,8 @@ namespace AppLauncher.Features.MqttControl
 
         [JsonProperty("timestamp")]
         public string? TimeStamp { get; set; }
+
+        [JsonProperty("location")]
+        public string? Location { get; set; }
     }
 }
