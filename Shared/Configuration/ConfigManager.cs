@@ -9,11 +9,11 @@ namespace AppLauncher.Shared.Configuration
         private const string ConfigFileName = "launcher_config.json";
         private const string AppName = "AppLauncher";
 
-        // AppData 경로 가져오기
+        // ProgramData 경로 가져오기
         private static string GetAppDataConfigPath()
         {
-            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            string appFolder = Path.Combine(appDataPath, AppName);
+            string programDataPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+            string appFolder = Path.Combine(programDataPath, AppName, "Data");
 
             if (!Directory.Exists(appFolder))
             {
@@ -91,16 +91,15 @@ namespace AppLauncher.Shared.Configuration
 
         private static LauncherConfig CreateDefaultConfig()
         {
-            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            string appFolder = Path.Combine(appDataPath, AppName);
+            string programDataPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+            string appFolder = Path.Combine(programDataPath, AppName, "Data");
 
             return new LauncherConfig
             {
-                TargetExecutable = @"C:\Program Files (x86)\\HBOT Operator\HBOT Operator.exe",
+                TargetExecutable = @"C:\Program Files (x86)\HBOT Operator\HBOT Operator.exe",
                 WorkingDirectory = "", // 비워두면 실행 파일 디렉토리를 자동으로 사용
-                LocalVersionFile = Path.Combine(baseDir, "labview_version.txt"),  // LabView 버전 (실행 파일 옆)
-                LauncherVersionFile = Path.Combine(appFolder, "launcher_version.txt"),  // 런처 버전 (AppData)
+                LocalVersionFile = Path.Combine(appFolder, "labview_version.txt"),  // LabView 버전
+                LauncherVersionFile = Path.Combine(appFolder, "launcher_version.txt"),  // 런처 버전
                 MqttSettings = new MqttSettings
                 {
                     Broker = "localhost",

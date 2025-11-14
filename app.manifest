@@ -17,7 +17,7 @@
             compatibility.
         -->
         <!-- 개발 중: asInvoker, 배포 시: requireAdministrator -->
-        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
+        <requestedExecutionLevel level="highestAvailable" uiAccess="false" />
       </requestedPrivileges>
     </security>
   </trustInfo>

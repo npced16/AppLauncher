@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using AppLauncher.Features.AppLaunching;
@@ -20,17 +21,20 @@ namespace AppLauncher.Features.MqttControl
         private readonly LauncherConfig _config;
         private readonly Action<string> _statusCallback;
         private readonly Action<string>? _installStatusCallback;
+        private readonly ApplicationLauncher? _applicationLauncher;
 
         public MqttMessageHandler(
             MqttService mqttService,
             LauncherConfig config,
             Action<string> statusCallback,
-            Action<string>? installStatusCallback = null)
+            Action<string>? installStatusCallback = null,
+            ApplicationLauncher? applicationLauncher = null)
         {
             _mqttService = mqttService ?? throw new ArgumentNullException(nameof(mqttService));
             _config = config ?? throw new ArgumentNullException(nameof(config));
             _statusCallback = statusCallback ?? throw new ArgumentNullException(nameof(statusCallback));
             _installStatusCallback = installStatusCallback;
+            _applicationLauncher = applicationLauncher;
         }
 
         /// <summary>
@@ -119,15 +123,22 @@ namespace AppLauncher.Features.MqttControl
                 _statusCallback("파일 다운로드 중...");
                 _installStatusCallback?.Invoke("다운로드 중");
 
-                // 임시 디렉토리 생성
-                string tempDir = Path.Combine(Path.GetTempPath(), "AppLauncherDownloads");
+                // 다운로드 디렉토리 생성 (C:\ProgramData\AppLauncher\Downloads)
+                string programDataPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+                string tempDir = Path.Combine(programDataPath, "AppLauncher", "Downloads");
                 if (!Directory.Exists(tempDir))
                     Directory.CreateDirectory(tempDir);
 
                 // 파일명 추출
                 string fileName = Path.GetFileName(new Uri(downloadUrl).LocalPath);
-                if (!fileName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                bool isZipFile = fileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase);
+                bool isExeFile = fileName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase);
+
+                if (!isZipFile && !isExeFile)
+                {
+                    // 기본값: exe로 간주
                     fileName = $"download_{DateTime.Now:yyyyMMddHHmmss}.exe";
+                }
 
                 string downloadPath = Path.Combine(tempDir, fileName);
 
@@ -154,8 +165,16 @@ namespace AppLauncher.Features.MqttControl
 
                 _statusCallback($"다운로드 완료: {Path.GetFileName(downloadPath)}");
 
-                // 다운로드한 파일 실행
-                ExecuteProgram(downloadPath, command);
+                // zip 파일이면 압축 해제
+                if (isZipFile)
+                {
+                    await ExtractZipFileAsync(downloadPath, command);
+                }
+                else
+                {
+                    // exe 파일이면 실행
+                    ExecuteProgram(downloadPath, command);
+                }
 
                 return downloadPath;
             }
@@ -165,6 +184,87 @@ namespace AppLauncher.Features.MqttControl
                 SendStatusResponse("error", ex.Message);
                 _installStatusCallback?.Invoke("대기 중");
                 return "";
+            }
+        }
+
+        /// <summary>
+        /// ZIP 파일 압축 해제
+        /// </summary>
+        private async Task ExtractZipFileAsync(string zipFilePath, LaunchCommand command)
+        {
+            try
+            {
+                _statusCallback("압축 해제 중...");
+                _installStatusCallback?.Invoke("압축 해제 중");
+                SendStatusResponse("extracting", zipFilePath);
+
+                // 압축 해제 대상 디렉토리 결정
+                string extractDir;
+
+                // config에 WorkingDirectory가 설정되어 있으면 사용
+                if (!string.IsNullOrEmpty(_config.WorkingDirectory) && Directory.Exists(_config.WorkingDirectory))
+                {
+                    extractDir = _config.WorkingDirectory;
+                }
+                else
+                {
+                    // 없으면 zip 파일과 같은 폴더에 바로 압축 해제
+                    extractDir = Path.GetDirectoryName(zipFilePath) ?? Path.GetTempPath();
+                }
+
+                // 압축 해제 디렉토리가 없으면 생성
+                if (!Directory.Exists(extractDir))
+                {
+                    Directory.CreateDirectory(extractDir);
+                }
+
+                _statusCallback($"압축 해제 위치: {extractDir}");
+                Console.WriteLine($"[ZIP] Extracting to: {extractDir}");
+
+                // 기존 Volume 폴더가 있으면 삭제
+                string volumeDir = Path.Combine(extractDir, "Volume");
+                if (Directory.Exists(volumeDir))
+                {
+                    _statusCallback("기존 Volume 폴더 삭제 중...");
+                    Console.WriteLine($"[ZIP] Deleting existing Volume folder: {volumeDir}");
+                    Directory.Delete(volumeDir, recursive: true);
+                }
+
+                // 압축 해제 (비동기)
+                await Task.Run(() =>
+                {
+                    ZipFile.ExtractToDirectory(zipFilePath, extractDir, overwriteFiles: true);
+                });
+
+                _statusCallback($"압축 해제 완료: {extractDir}");
+                Console.WriteLine($"[ZIP] Extraction completed: {extractDir}");
+                SendStatusResponse("extract_success", extractDir);
+
+                // Volume 폴더 안의 setup.exe 찾기
+                string setupExePath = Path.Combine(volumeDir, "setup.exe");
+
+                if (File.Exists(setupExePath))
+                {
+                    _statusCallback($"setup.exe 발견: {setupExePath}");
+                    Console.WriteLine($"[ZIP] Found setup.exe in Volume folder: {setupExePath}");
+
+                    // PowerShell로 setup.exe 실행
+                    ExecuteSetupWithPowerShell(setupExePath, command);
+                }
+                else
+                {
+                    _statusCallback("압축 해제 완료. Volume 폴더에서 setup.exe를 찾을 수 없어 자동 실행하지 않습니다.");
+                    Console.WriteLine($"[ZIP] setup.exe not found in {volumeDir}");
+                    SendStatusResponse("extract_complete_no_setup", volumeDir);
+                    _installStatusCallback?.Invoke("대기 중");
+                }
+            }
+            catch (Exception ex)
+            {
+                _statusCallback($"압축 해제 오류: {ex.Message}");
+                Console.WriteLine($"[ZIP] Extraction error: {ex.Message}");
+                SendStatusResponse("extract_error", ex.Message);
+                _installStatusCallback?.Invoke("대기 중");
             }
         }
 
@@ -252,9 +352,19 @@ namespace AppLauncher.Features.MqttControl
                 // MQTT: 설치 시작 로그 전송
                 SendStatusResponse("install_start", $"Setup.exe 실행 시작: {setupExePath}");
 
+                // 로그 파일 경로 생성 (C:\ProgramData\AppLauncher\Logs)
+                string programDataPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+                string logDir = Path.Combine(programDataPath, "AppLauncher", "Logs");
+                if (!Directory.Exists(logDir))
+                {
+                    Directory.CreateDirectory(logDir);
+                }
+                string logFilePath = Path.Combine(logDir, $"install_log_{DateTime.Now:yyyyMMddHHmmss}.txt");
+                Console.WriteLine($"Log file path: {logFilePath}");
+
                 // setup.exe 실행하고 모니터링을 위한 PID 가져오기
                 string psCommand = $@"
-$proc = Start-Process '{setupExePath}' -ArgumentList '/q','/AcceptLicenses','yes' -Verb RunAs -PassThru
+$proc = Start-Process '{setupExePath}' -ArgumentList '/q','/AcceptLicenses','yes','/log','{logFilePath}' -Verb RunAs -PassThru
 Write-Output $proc.Id
 ";
 
@@ -263,6 +373,7 @@ Write-Output $proc.Id
                 _statusCallback($"PowerShell로 Setup.exe 실행");
                 SendStatusResponse("install_command", setupExePath);
 
+                // TODO : C 드라이브 밖에서 실행해 볼 것  
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = "powershell.exe",
@@ -270,7 +381,8 @@ Write-Output $proc.Id
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardOutput = true,
-                    RedirectStandardError = true
+                    RedirectStandardError = true,
+                    WorkingDirectory = Path.GetDirectoryName(setupExePath) // setup.exe가 있는 폴더로 설정
                 };
 
                 var psProcess = Process.Start(startInfo);
@@ -294,6 +406,9 @@ Write-Output $proc.Id
                     {
                         Console.WriteLine($"Setup.exe PID: {setupPid}");
                         SendStatusResponse("setup_pid", setupPid.ToString());
+
+                        // 프로세스가 시작될 때까지 잠시 대기
+                        System.Threading.Thread.Sleep(1000);
 
                         // setup.exe 프로세스 모니터링
                         try
@@ -533,13 +648,18 @@ Write-Output $proc.Id
                 SendStatusResponse("update_required", $"버전 업데이트 필요: {currentVersion} -> {incomingVersion}");
                 _installStatusCallback?.Invoke("런처 업데이트 중");
 
-                // self-contained 빌드 지원
-                string currentExePath = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                // Program Files 경로로 고정
+                string targetExePath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                    "AppLauncher",
+                    "AppLauncher.exe"
+                );
+
                 string versionFile = _config.LauncherVersionFile ??
                     Path.Combine(Path.GetDirectoryName(ConfigManager.GetConfigFilePath()) ?? "", "launcher_version.txt");
 
                 _statusCallback($"새 버전 {command.Version} 다운로드 중...");
-                await UpdateLauncherAsync(command.URL, command.Version, currentExePath, versionFile);
+                await UpdateLauncherAsync(command.URL, command.Version, targetExePath, versionFile);
             }
             catch (Exception ex)
             {
@@ -715,6 +835,96 @@ Write-Output $proc.Id
             catch
             {
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// setting.ini 파일 백업
+        /// </summary>
+        private string? BackupSettingFile()
+        {
+            try
+            {
+                // 원본 파일 경로
+                string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                string settingFilePath = Path.Combine(documentsPath, "HBOT", "Setting", "setting.ini");
+
+                if (!File.Exists(settingFilePath))
+                {
+                    Console.WriteLine($"[BACKUP] setting.ini not found: {settingFilePath}");
+                    _statusCallback("setting.ini 파일이 없어 백업을 건너뜁니다.");
+                    return null;
+                }
+
+                // 백업 디렉토리 생성 (C:\ProgramData\AppLauncher\Backup)
+                string programDataPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+                string backupDir = Path.Combine(programDataPath, "AppLauncher", "Backup");
+                if (!Directory.Exists(backupDir))
+                {
+                    Directory.CreateDirectory(backupDir);
+                }
+
+                // 백업 파일 경로 (타임스탬프 추가)
+                string backupFilePath = Path.Combine(backupDir, $"setting_{DateTime.Now:yyyyMMddHHmmss}.ini");
+
+                // 파일 복사
+                File.Copy(settingFilePath, backupFilePath, overwrite: true);
+
+                Console.WriteLine($"[BACKUP] Setting file backed up: {backupFilePath}");
+                _statusCallback($"설정 파일 백업 완료: {backupFilePath}");
+                SendStatusResponse("setting_backup", backupFilePath);
+
+                return backupFilePath;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[BACKUP] Failed to backup setting file: {ex.Message}");
+                _statusCallback($"설정 파일 백업 실패: {ex.Message}");
+                SendStatusResponse("backup_error", ex.Message);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// setting.ini 파일 복원
+        /// </summary>
+        private void RestoreSettingFile(string? backupFilePath)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(backupFilePath) || !File.Exists(backupFilePath))
+                {
+                    Console.WriteLine($"[RESTORE] No backup file to restore");
+                    _statusCallback("복원할 백업 파일이 없습니다.");
+                    return;
+                }
+
+                // 복원 대상 경로
+                string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                string settingDir = Path.Combine(documentsPath, "HBOT", "Setting");
+                string settingFilePath = Path.Combine(settingDir, "setting.ini");
+
+                // 디렉토리가 없으면 생성
+                if (!Directory.Exists(settingDir))
+                {
+                    Directory.CreateDirectory(settingDir);
+                }
+
+                // 파일 복원
+                File.Copy(backupFilePath, settingFilePath, overwrite: true);
+
+                Console.WriteLine($"[RESTORE] Setting file restored: {settingFilePath}");
+                _statusCallback($"설정 파일 복원 완료: {settingFilePath}");
+                SendStatusResponse("setting_restore", settingFilePath);
+
+                // 백업 파일 삭제 (선택사항)
+                // File.Delete(backupFilePath);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[RESTORE] Failed to restore setting file: {ex.Message}");
+                _statusCallback($"설정 파일 복원 실패: {ex.Message}");
+                SendStatusResponse("restore_error", ex.Message);
             }
         }
 

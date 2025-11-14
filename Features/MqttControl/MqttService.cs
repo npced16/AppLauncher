@@ -309,5 +309,8 @@ namespace AppLauncher.Features.MqttControl
 
         [JsonProperty("location")]
         public string? Location { get; set; }
+
+        [JsonProperty("processId")]
+        public int? ProcessId { get; set; }
     }
 }

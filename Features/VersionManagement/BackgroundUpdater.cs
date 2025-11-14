@@ -77,11 +77,11 @@ namespace AppLauncher.Features.VersionManagement
         {
             try
             {
-                // 임시 디렉토리 생성
-                string tempDir = Path.Combine(Path.GetTempPath(), "AppLauncherUpdate");
-                if (Directory.Exists(tempDir))
-                    Directory.Delete(tempDir, true);
-                Directory.CreateDirectory(tempDir);
+                // 다운로드 디렉토리 생성 (C:\ProgramData\AppLauncher\Downloads)
+                string programDataPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+                string tempDir = Path.Combine(programDataPath, "AppLauncher", "Downloads");
+                if (!Directory.Exists(tempDir))
+                    Directory.CreateDirectory(tempDir);
 
                 // EXE 파일 다운로드
                 string fileName = Path.GetFileName(new Uri(_downloadUrl).LocalPath);

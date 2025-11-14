@@ -24,11 +24,56 @@ namespace AppLauncher.Features.TrayApp
         private MqttMessageHandler? _mqttMessageHandler;
         private LauncherConfig? _config;
         private ToolStripMenuItem? _installStatusMenuItem;
+        private ApplicationLauncher? _applicationLauncher;
 
         public TrayApplicationContext()
         {
+            // 자동 설치: Program Files가 아닌 곳에서 실행되면 자동으로 Program Files로 복사
+            CheckAndInstallToSystemPath();
+
             InitializeTrayIcon();
             StartServices();
+        }
+
+        /// <summary>
+        /// Program Files가 아닌 곳에서 실행되면 자동으로 설치
+        /// </summary>
+        private void CheckAndInstallToSystemPath()
+        {
+            try
+            {
+                string currentExePath = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                if (string.IsNullOrEmpty(currentExePath))
+                    return;
+
+                string programFilesPath = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+                string targetDir = Path.Combine(programFilesPath, "AppLauncher");
+                string targetExePath = Path.Combine(targetDir, "AppLauncher.exe");
+
+                // 이미 Program Files에서 실행 중이면 스킵
+                if (currentExePath.Equals(targetExePath, StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                // Program Files로 복사
+                if (!Directory.Exists(targetDir))
+                    Directory.CreateDirectory(targetDir);
+
+                File.Copy(currentExePath, targetExePath, true);
+
+                // Program Files 버전 실행하고 현재 프로세스 종료
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = targetExePath,
+                    UseShellExecute = true
+                };
+                Process.Start(startInfo);
+
+                Environment.Exit(0);
+            }
+            catch
+            {
+                // 설치 실패해도 계속 실행 (관리자 권한이 없을 수 있음)
+            }
         }
 
         private void InitializeTrayIcon()
@@ -125,8 +170,8 @@ namespace AppLauncher.Features.TrayApp
 
                 // 백그라운드에서 대상 프로그램 실행
                 _notifyIcon.Text = "App Launcher - 프로그램 실행 중...";
-                var launcher = new ApplicationLauncher();
-                await launcher.CheckAndLaunchInBackgroundAsync(_config, UpdateTrayStatus);
+                _applicationLauncher = new ApplicationLauncher();
+                await _applicationLauncher.CheckAndLaunchInBackgroundAsync(_config, UpdateTrayStatus);
 
                 // MQTT 서비스 시작
                 if (_config.MqttSettings != null)
@@ -162,7 +207,8 @@ namespace AppLauncher.Features.TrayApp
                     _mqttService,
                     _config,
                     UpdateTrayStatus,
-                    UpdateInstallStatus
+                    UpdateInstallStatus,
+                    _applicationLauncher
                 );
 
                 // 이벤트 핸들러 등록
@@ -345,6 +391,12 @@ namespace AppLauncher.Features.TrayApp
 
         public new void Dispose()
         {
+            // 관리 중인 프로세스 종료
+            if (_applicationLauncher != null)
+            {
+                _applicationLauncher.Cleanup();
+            }
+
             // MQTT 서비스 정리
             if (_mqttService != null)
             {

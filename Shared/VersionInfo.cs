@@ -1,3 +1,5 @@
+using System.Reflection;
+
 namespace AppLauncher.Shared
 {
     /// <summary>
@@ -7,8 +9,9 @@ namespace AppLauncher.Shared
     {
         /// <summary>
         /// 현재 런처의 버전
-        /// 업데이트할 때마다 이 값을 수동으로 올려야 합니다
+        /// Properties/AssemblyInfo.cs와 app.manifest의 assemblyIdentity version에서 자동으로 가져옵니다
         /// </summary>
-        public const string LAUNCHER_VERSION = "1.0.1";
+        public static readonly string LAUNCHER_VERSION =
+            Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0";
     }
 }
