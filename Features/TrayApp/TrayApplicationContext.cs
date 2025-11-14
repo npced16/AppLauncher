@@ -26,13 +26,28 @@ namespace AppLauncher.Features.TrayApp
         private ToolStripMenuItem? _installStatusMenuItem;
         private ApplicationLauncher? _applicationLauncher;
 
+        private static void DebugLog(string message)
+        {
+#if DEBUG
+            Console.WriteLine(message);
+#endif
+        }
+
         public TrayApplicationContext()
         {
+            DebugLog("[TrayApplicationContext] 생성자 시작");
+
             // 자동 설치: Program Files가 아닌 곳에서 실행되면 자동으로 Program Files로 복사
+            DebugLog("[TrayApplicationContext] CheckAndInstallToSystemPath 호출");
             CheckAndInstallToSystemPath();
 
+            DebugLog("[TrayApplicationContext] InitializeTrayIcon 호출");
             InitializeTrayIcon();
+
+            DebugLog("[TrayApplicationContext] StartServices 호출");
             StartServices();
+
+            DebugLog("[TrayApplicationContext] 생성자 완료");
         }
 
         /// <summary>
@@ -40,27 +55,47 @@ namespace AppLauncher.Features.TrayApp
         /// </summary>
         private void CheckAndInstallToSystemPath()
         {
+            DebugLog("\n[설치] CheckAndInstallToSystemPath 시작");
             try
             {
                 string currentExePath = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                DebugLog($"[설치] 현재 실행 경로: {currentExePath}");
+
                 if (string.IsNullOrEmpty(currentExePath))
+                {
+                    DebugLog("[설치] 경로가 비어있음 - 종료");
                     return;
+                }
 
                 string programFilesPath = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+                DebugLog($"[설치] Program Files 경로: {programFilesPath}");
+
                 string targetDir = Path.Combine(programFilesPath, "AppLauncher");
                 string targetExePath = Path.Combine(targetDir, "AppLauncher.exe");
+                DebugLog($"[설치] 목표 경로: {targetExePath}");
 
                 // 이미 Program Files에서 실행 중이면 스킵
                 if (currentExePath.Equals(targetExePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    DebugLog("[설치] 이미 Program Files에서 실행 중 - 스킵");
                     return;
+                }
+
+                DebugLog("[설치] Program Files로 복사 시작...");
 
                 // Program Files로 복사
                 if (!Directory.Exists(targetDir))
+                {
+                    DebugLog($"[설치] 디렉토리 생성: {targetDir}");
                     Directory.CreateDirectory(targetDir);
+                }
 
+                DebugLog("[설치] 파일 복사 중...");
                 File.Copy(currentExePath, targetExePath, true);
+                DebugLog("[설치] 파일 복사 완료");
 
                 // Program Files 버전 실행하고 현재 프로세스 종료
+                DebugLog("[설치] Program Files 버전 실행...");
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = targetExePath,
@@ -68,11 +103,22 @@ namespace AppLauncher.Features.TrayApp
                 };
                 Process.Start(startInfo);
 
+                DebugLog("[설치] 현재 프로세스 종료");
                 Environment.Exit(0);
             }
-            catch
+            catch (Exception ex)
             {
-                // 설치 실패해도 계속 실행 (관리자 권한이 없을 수 있음)
+                DebugLog($"[설치] 오류 발생: {ex.GetType().Name}");
+                DebugLog($"[설치] 오류 메시지: {ex.Message}");
+                DebugLog($"[설치] 스택 트레이스:\n{ex.StackTrace}");
+
+                // 설치 실패 - 사용자에게 알림
+                MessageBox.Show(
+                    $"Program Files 설치 실패:\n{ex.Message}\n\n현재 위치에서 계속 실행합니다.",
+                    "설치 실패",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                );
             }
         }
 
