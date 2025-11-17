@@ -198,6 +198,7 @@ namespace AppLauncher.Features.MqttControl
                 _installStatusCallback?.Invoke("압축 해제 중");
                 SendStatusResponse("extracting", zipFilePath);
 
+
                 // 압축 해제 대상 디렉토리 결정
                 string extractDir;
 
@@ -211,7 +212,6 @@ namespace AppLauncher.Features.MqttControl
                     // 없으면 zip 파일과 같은 폴더에 바로 압축 해제
                     extractDir = Path.GetDirectoryName(zipFilePath) ?? Path.GetTempPath();
                 }
-
                 // 압축 해제 디렉토리가 없으면 생성
                 if (!Directory.Exists(extractDir))
                 {
@@ -290,7 +290,6 @@ namespace AppLauncher.Features.MqttControl
                     FileName = executable,
                     UseShellExecute = true
                 };
-
                 // 작업 디렉토리 자동 설정: config > executable이 있는 디렉토리
                 string workingDir = _config.WorkingDirectory ?? "";
 
@@ -349,10 +348,9 @@ namespace AppLauncher.Features.MqttControl
                     SendStatusResponse("warning", "Not running as administrator");
                 }
 
-                // MQTT: 설치 시작 로그 전송
                 SendStatusResponse("install_start", $"Setup.exe 실행 시작: {setupExePath}");
 
-                // 로그 파일 경로 생성 (C:\ProgramData\AppLauncher\Logs)
+                // 로그 파일 경로 생성
                 string programDataPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
                 string logDir = Path.Combine(programDataPath, "AppLauncher", "Logs");
                 if (!Directory.Exists(logDir))
@@ -362,27 +360,36 @@ namespace AppLauncher.Features.MqttControl
                 string logFilePath = Path.Combine(logDir, $"install_log_{DateTime.Now:yyyyMMddHHmmss}.txt");
                 Console.WriteLine($"Log file path: {logFilePath}");
 
-                // setup.exe 실행하고 모니터링을 위한 PID 가져오기
+                // powershell - Command "Start-Process '.\setup.exe' -ArgumentList '/q','/AcceptLicenses','yes','/log','C:\install_log_TS.txt' -Verb RunAs ㅋ; 
                 string psCommand = $@"
-$proc = Start-Process '{setupExePath}' -ArgumentList '/q','/AcceptLicenses','yes','/log','{logFilePath}' -Verb RunAs -PassThru
+# Setup.exe 실행
+$proc = Start-Process '{setupExePath}'  -ArgumentList '/q','/AcceptLicenses','yes','/log','{logFilePath}' -Verb RunAs  -PassThru -Wait
+
+# Exit code 확인
+$exitCode = $proc.ExitCode
+Write-Output ""ExitCode:$exitCode""
+
+# Cleanup 대기 시간 20초
+Write-Output ""WaitingCleanup""
+Start-Sleep -Seconds 20
+Write-Output ""CleanupComplete""
+
+# PID 출력
 Write-Output $proc.Id
 ";
 
-                Console.WriteLine("Executing Setup.exe via PowerShell (-Verb RunAs)");
-                Console.WriteLine($"Setup Path: {setupExePath}");
-                _statusCallback($"PowerShell로 Setup.exe 실행");
-                SendStatusResponse("install_command", setupExePath);
+                var bytes = System.Text.Encoding.Unicode.GetBytes(psCommand);
+                var encodedCommand = Convert.ToBase64String(bytes);
 
-                // TODO : C 드라이브 밖에서 실행해 볼 것  
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = "powershell.exe",
-                    Arguments = $"-Command \"{psCommand}\"",
+                    Arguments = $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedCommand}",
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
-                    WorkingDirectory = Path.GetDirectoryName(setupExePath) // setup.exe가 있는 폴더로 설정
+                    WorkingDirectory = Path.GetDirectoryName(setupExePath)
                 };
 
                 var psProcess = Process.Start(startInfo);
@@ -390,88 +397,80 @@ Write-Output $proc.Id
                 {
                     Console.WriteLine($"PowerShell process started (PID: {psProcess.Id})");
 
-                    // setup.exe PID 읽기
-                    string output = psProcess.StandardOutput.ReadToEnd();
-                    string error = psProcess.StandardError.ReadToEnd();
+                    // ⭐ 실시간 출력 읽기
+                    string output = "";
+                    string error = "";
 
-                    psProcess.WaitForExit();
+                    // 비동기로 출력 읽기
+                    Task outputTask = Task.Run(() => output = psProcess.StandardOutput.ReadToEnd());
+                    Task errorTask = Task.Run(() => error = psProcess.StandardError.ReadToEnd());
+
+                    // ⭐ 타임아웃 설정 (25분)
+                    int timeoutMinutes = 25;
+                    bool completed = psProcess.WaitForExit(timeoutMinutes * 60 * 1000);
+
+                    Task.WaitAll(outputTask, errorTask);
+
+                    if (!completed)
+                    {
+                        Console.WriteLine($"[TIMEOUT] Installation timeout after {timeoutMinutes} minutes");
+                        _statusCallback($"설치 타임아웃 ({timeoutMinutes}분 초과)");
+                        SendStatusResponse("install_timeout", $"Timeout after {timeoutMinutes} minutes");
+
+                        try
+                        {
+                            psProcess.Kill();
+                        }
+                        catch { }
+
+                        _installStatusCallback?.Invoke("대기 중");
+                        return;
+                    }
 
                     if (!string.IsNullOrEmpty(error))
                     {
                         Console.WriteLine($"PowerShell Error:\n{error}");
                     }
 
-                    // 출력에서 setup.exe PID 파싱
-                    if (int.TryParse(output.Trim(), out int setupPid))
+                    // ⭐ 출력 파싱
+                    Console.WriteLine($"PowerShell Output:\n{output}");
+
+                    // Exit code 추출
+                    int exitCode = 0;
+                    var lines = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var line in lines)
                     {
-                        Console.WriteLine($"Setup.exe PID: {setupPid}");
-                        SendStatusResponse("setup_pid", setupPid.ToString());
-
-                        // 프로세스가 시작될 때까지 잠시 대기
-                        System.Threading.Thread.Sleep(1000);
-
-                        // setup.exe 프로세스 모니터링
-                        try
+                        if (line.StartsWith("ExitCode:"))
                         {
-                            var setupProcess = Process.GetProcessById(setupPid);
-                            Console.WriteLine($"Monitoring setup.exe (PID: {setupPid})");
-                            _statusCallback($"설치 모니터링 중 (PID: {setupPid})");
-
-                            // 5초마다 프로세스 모니터링
-                            while (!setupProcess.HasExited)
-                            {
-                                try
-                                {
-                                    var cpuTime = setupProcess.TotalProcessorTime;
-                                    var workingSet = setupProcess.WorkingSet64 / 1024 / 1024; // MB
-                                    Console.WriteLine($"[Monitor] PID: {setupPid}, CPU Time: {cpuTime.TotalSeconds:F1}s, Memory: {workingSet}MB");
-                                    SendStatusResponse("setup_status", $"CPU: {cpuTime.TotalSeconds:F1}s, Mem: {workingSet}MB");
-                                }
-                                catch
-                                {
-                                    // 프로세스가 종료되었을 수 있음
-                                    break;
-                                }
-
-                                System.Threading.Thread.Sleep(5000);
-                            }
-
-                            setupProcess.WaitForExit();
-                            int exitCode = setupProcess.ExitCode;
-                            Console.WriteLine($"Setup.exe Exit Code: {exitCode}");
-
-                            if (exitCode != 0)
-                            {
-                                Console.WriteLine($"[FAILED] Installation failed (Exit Code: {exitCode})");
-                                Console.WriteLine($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                                _statusCallback($"설치 실패 (종료 코드: {exitCode})");
-                                SendStatusResponse("install_failed", $"Exit code: {exitCode}");
-                                _installStatusCallback?.Invoke("대기 중");
-                                return;
-                            }
-
-                            Console.WriteLine($"[SUCCESS] Installation completed");
-                            Console.WriteLine($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                            _statusCallback($"설치 완료 (종료 코드: {exitCode})");
-                            SendStatusResponse("install_success", $"Exit code: {exitCode}");
+                            int.TryParse(line.Substring("ExitCode:".Length), out exitCode);
+                            Console.WriteLine($"Parsed Exit Code: {exitCode}");
                         }
-                        catch (ArgumentException)
+                        else if (line == "WaitingCleanup")
                         {
-                            Console.WriteLine($"[ERROR] Setup.exe process (PID: {setupPid}) not found or already exited");
-                            _statusCallback($"설치 프로세스를 찾을 수 없음 (PID: {setupPid})");
-                            SendStatusResponse("error", $"Setup process not found: {setupPid}");
-                            _installStatusCallback?.Invoke("대기 중");
-                            return;
+                            Console.WriteLine("Waiting for cleanup (20 seconds)...");
+                            _statusCallback("설치 완료, 정리 중 (20초 대기)...");
+                        }
+                        else if (line == "CleanupComplete")
+                        {
+                            Console.WriteLine("Cleanup wait completed");
+                            _statusCallback("정리 완료");
                         }
                     }
-                    else
+
+                    if (exitCode != 0)
                     {
-                        Console.WriteLine($"[ERROR] Failed to get Setup.exe PID. PowerShell output: {output}");
-                        _statusCallback("Setup.exe PID를 가져올 수 없음");
-                        SendStatusResponse("error", "Failed to get setup.exe PID");
+                        Console.WriteLine($"[FAILED] Installation failed (Exit Code: {exitCode})");
+                        Console.WriteLine($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                        _statusCallback($"설치 실패 (종료 코드: {exitCode})");
+                        SendStatusResponse("install_failed", $"Exit code: {exitCode}");
                         _installStatusCallback?.Invoke("대기 중");
                         return;
                     }
+
+                    Console.WriteLine($"[SUCCESS] Installation completed");
+                    Console.WriteLine($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                    _statusCallback($"설치 완료 (종료 코드: {exitCode})");
+                    SendStatusResponse("install_success", $"Exit code: {exitCode}");
                 }
                 else
                 {
@@ -483,7 +482,7 @@ Write-Output $proc.Id
                     return;
                 }
 
-                // 업데이트 완료 시 버전 정보 저장
+                // 버전 정보 저장
                 if (!string.IsNullOrEmpty(command.Version) && !string.IsNullOrEmpty(_config.LocalVersionFile))
                 {
                     try
@@ -505,10 +504,8 @@ Write-Output $proc.Id
                     }
                 }
 
-                _statusCallback("LabView 자동 설치 실행됨 (약 30분 소요)");
-
-                // Send status response
-                SendStatusResponse("installing", $"{setupExePath}");
+                _statusCallback("LabView 설치 완료");
+                _installStatusCallback?.Invoke("대기 중");
             }
             catch (Exception ex)
             {
@@ -521,7 +518,6 @@ Write-Output $proc.Id
                 _installStatusCallback?.Invoke("대기 중");
             }
         }
-
         /// <summary>
         /// 현재 상태를 MQTT로 전송 (연결 시 자동 호출)
         /// </summary>
@@ -546,18 +542,20 @@ Write-Output $proc.Id
                 var status = new
                 {
                     status = statusMessage,
-                    timestamp = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss"),
-                    mqttConnected = _mqttService.IsConnected,
-                    location = _config.MqttSettings?.Location,
-                    hardwareUUID = hardwareUuid,
-                    launcher = new
+                    payload = new
                     {
-                        version = launcherVersion
+                        location = _config.MqttSettings?.Location,
+                        hardwareUUID = hardwareUuid,
+                        launcher = new
+                        {
+                            version = launcherVersion
+                        },
+                        targetApp = new
+                        {
+                            version = targetAppVersion
+                        }
                     },
-                    targetApp = new
-                    {
-                        version = targetAppVersion
-                    }
+                    timestamp = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss")
                 };
 
                 await _mqttService.PublishJsonAsync(_mqttService.StatusTopic, status);
@@ -591,7 +589,7 @@ Write-Output $proc.Id
                     timestamp = DateTime.Now
                 };
 
-                await _mqttService.PublishJsonAsync(_mqttService.ResponseTopic, response);
+                await _mqttService.PublishJsonAsync(_mqttService.InstallStatusTopic, response);
             }
             catch
             {
@@ -612,17 +610,13 @@ Write-Output $proc.Id
                 // MQTT 명령에서 다운로드 URL과 버전 정보 확인
                 if (string.IsNullOrWhiteSpace(command.URL))
                 {
-                    _statusCallback("업데이트 실패: 다운로드 URL이 제공되지 않았습니다.");
-                    SendStatusResponse("error", "Download URL not provided in MQTT command");
-                    _installStatusCallback?.Invoke("대기 중");
+                    _installStatusCallback?.Invoke("업데이트 실패: URL 누락");
                     return;
                 }
 
                 if (string.IsNullOrWhiteSpace(command.Version))
                 {
-                    _statusCallback("업데이트 실패: 버전 정보가 제공되지 않았습니다.");
-                    SendStatusResponse("error", "Version not provided in MQTT command");
-                    _installStatusCallback?.Invoke("대기 중");
+                    _installStatusCallback?.Invoke("업데이트 실패: 버전 정보 누락");
                     return;
                 }
 
@@ -630,16 +624,10 @@ Write-Output $proc.Id
                 string currentVersion = VersionInfo.LAUNCHER_VERSION;
                 string incomingVersion = command.Version;
 
-                _statusCallback($"버전 비교: 현재 {currentVersion} vs 수신 {incomingVersion}");
-                SendStatusResponse("version_check", $"현재: {currentVersion}, 수신: {incomingVersion}");
-
-                // 버전 비교
                 bool needsUpdate = CompareVersions(currentVersion, incomingVersion);
 
                 if (!needsUpdate)
                 {
-                    _statusCallback($"업데이트 불필요: 현재 버전({currentVersion})이 최신이거나 동일합니다.");
-                    SendStatusResponse("update_skip", $"현재 버전 {currentVersion}이 최신입니다");
                     _installStatusCallback?.Invoke("대기 중");
                     return;
                 }

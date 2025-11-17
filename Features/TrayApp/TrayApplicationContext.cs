@@ -37,9 +37,13 @@ namespace AppLauncher.Features.TrayApp
         {
             DebugLog("[TrayApplicationContext] 생성자 시작");
 
-            // 자동 설치: Program Files가 아닌 곳에서 실행되면 자동으로 Program Files로 복사
+#if !DEBUG
+            // 자동 설치: Program Files가 아닌 곳에서 실행되면 자동으로 Program Files로 복사 (Release 모드에서만)
             DebugLog("[TrayApplicationContext] CheckAndInstallToSystemPath 호출");
             CheckAndInstallToSystemPath();
+#else
+            DebugLog("[TrayApplicationContext] Debug 모드 - 자동 설치 스킵");
+#endif
 
             DebugLog("[TrayApplicationContext] InitializeTrayIcon 호출");
             InitializeTrayIcon();

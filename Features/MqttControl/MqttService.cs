@@ -52,9 +52,11 @@ namespace AppLauncher.Features.MqttControl
         public string StatusTopic => $"device/{_clientId}/status";
 
         /// <summary>
-        /// 응답 발행 토픽 (device/{deviceId}/response)
+        /// 설치 상태 발행 토픽 (device/{deviceId}/installStatus)
         /// </summary>
-        public string ResponseTopic => $"device/{_clientId}/response";
+        public string InstallStatusTopic => $"device/{_clientId}/installStatus";
+
+
 
         public MqttService(MqttSettings settings, string clientId)
         {
