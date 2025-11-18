@@ -13,7 +13,6 @@ C:\Program Files\AppLauncher\
 C:\ProgramData\AppLauncher\
   ├─ Data\                       (설정 파일)
   │   ├─ launcher_config.json
-  │   ├─ launcher_version.txt
   │   └─ labview_version.txt
   ├─ Downloads\                  (zip/exe 다운로드)
   │   └─ [다운로드 파일들]

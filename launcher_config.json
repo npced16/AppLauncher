@@ -1,6 +1,5 @@
 {
   "targetExecutable": "C:\\Program Files (x86)\\HBOT Operator\\HBOT Operator.exe",
-  "workingDirectory": "",
   "localVersionFile": "version.txt",
   "mqttSettings": {
     "broker": "server3.ibexserver.com",

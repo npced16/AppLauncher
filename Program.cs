@@ -7,6 +7,10 @@ using Microsoft.Win32;
 using AppLauncher.Features.TrayApp;
 using AppLauncher.Shared;
 using System.IO;
+using AppLauncher.Features.VersionManagement;
+using AppLauncher.Presentation.WinForms;
+using AppLauncher.Shared.Configuration;
+using AppLauncher.Features.AppLaunching;
 
 namespace AppLauncher
 {
@@ -225,6 +229,71 @@ namespace AppLauncher
             DebugLog("\n[Main] WinForms 앱 설정...");
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+
+            // 예약된 업데이트 확인
+            DebugLog("[Main] Pending update 확인...");
+            if (PendingUpdateManager.HasPendingUpdate())
+            {
+                DebugLog("[Main] Pending update 발견! 업데이트 진행...");
+
+                try
+                {
+                    var pendingUpdate = PendingUpdateManager.LoadPendingUpdate();
+                    if (pendingUpdate != null)
+                    {
+                        // 설정 파일 로드
+                        var config = ConfigManager.LoadConfig();
+
+                        // 전체화면 업데이트 프로그레스 폼 표시
+                        using (var updateForm = new UpdateProgressForm(pendingUpdate, config))
+                        {
+                            DebugLog("[Main] UpdateProgressForm 실행...");
+                            Application.Run(updateForm);
+                            DebugLog("[Main] UpdateProgressForm 종료");
+                        }
+
+                        DebugLog("[Main] 업데이트 완료. 컴퓨터 재시작 예정...");
+                        // 업데이트 완료 후 컴퓨터 재시작되므로 여기서 종료
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    DebugLog($"[Main] 업데이트 처리 오류: {ex.Message}");
+                    MessageBox.Show(
+                        $"업데이트 처리 중 오류가 발생했습니다:\n{ex.Message}\n\n정상 모드로 계속 진행합니다.",
+                        "업데이트 오류",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning
+                    );
+                }
+            }
+            else
+            {
+                // 업데이트가 없으면 백그라운드 프로그램 시작
+                DebugLog("[Main] 업데이트 없음. 백그라운드 프로그램 시작...");
+
+                try
+                {
+                    var config = ConfigManager.LoadConfig();
+                    if (!string.IsNullOrEmpty(config.TargetExecutable) && File.Exists(config.TargetExecutable))
+                    {
+                        var launcher = new ApplicationLauncher();
+                        Action<string> statusCallback = status => DebugLog($"[LAUNCH] {status}");
+                        _ = launcher.CheckAndLaunchInBackgroundAsync(config, statusCallback);
+
+                        DebugLog("[Main] 백그라운드 프로그램 시작 완료");
+                    }
+                    else
+                    {
+                        DebugLog("[Main] 대상 프로그램이 설정되지 않음");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    DebugLog($"[Main] 백그라운드 프로그램 시작 오류: {ex.Message}");
+                }
+            }
 
             // 트레이 앱 시작
             DebugLog("[Main] TrayApplicationContext 생성...");

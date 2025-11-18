@@ -95,16 +95,14 @@ namespace AppLauncher.Features.MqttControl
         /// <summary>
         /// MQTT 명령으로 애플리케이션 실행
         /// </summary>
-        private async void UpdateLabView(LaunchCommand command)
+        private void UpdateLabView(LaunchCommand command)
         {
             try
             {
-                string executable;
-
-                // url이 있으면 다운로드 후 실행
+                // url이 있으면 업데이트 예약 및 런처 재시작
                 if (!string.IsNullOrEmpty(command.URL))
                 {
-                    _statusCallback("다운로드 중...");
+                    _statusCallback("업데이트 예약 중...");
                     var LabViewUpdater = new LabViewUpdater(
                         command,
                         _config,
@@ -112,10 +110,11 @@ namespace AppLauncher.Features.MqttControl
                         _installStatusCallback,
                         SendStatusResponse
                      );
-                    executable = await LabViewUpdater.DownloadAndExecuteAsync();
+
+                    // 업데이트를 예약하고 런처 재시작
+                    LabViewUpdater.ScheduleUpdate();
                     return;
                 }
-                // 다운로드 에러 mqtt 응답은 DownloadAndExecuteAsync에서 처리 
             }
             catch (Exception ex)
             {

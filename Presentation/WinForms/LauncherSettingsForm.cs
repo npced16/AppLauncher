@@ -64,23 +64,6 @@ namespace AppLauncher.Presentation.WinForms
             browseExecutableButton.Click += BrowseExecutableButton_Click;
             this.Controls.Add(browseExecutableButton);
 
-            // Working Directory Label
-            var workingDirLabel = new Label
-            {
-                Text = "작업 디렉토리 (선택사항):",
-                Location = new Point(20, 85),
-                Size = new Size(200, 20)
-            };
-            this.Controls.Add(workingDirLabel);
-
-            // Working Directory TextBox
-            workingDirectoryTextBox = new TextBox
-            {
-                Location = new Point(20, 110),
-                Size = new Size(450, 25)
-            };
-            this.Controls.Add(workingDirectoryTextBox);
-
             // Browse Directory Button
             browseDirectoryButton = new Button
             {

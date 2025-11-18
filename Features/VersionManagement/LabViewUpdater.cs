@@ -34,9 +34,39 @@ namespace AppLauncher.Features.VersionManagement
             _sendStatusResponse = sendStatusResponse;
         }
 
+
         private void SendStatusResponse(string status, string message)
         {
             _sendStatusResponse(status, message);
+        }
+
+        /// <summary>
+        /// 업데이트를 예약 (다음 런처 재시작 시 자동 실행)
+        /// </summary>
+        public void ScheduleUpdate()
+        {
+            try
+            {
+                Console.WriteLine("[SCHEDULE] Scheduling update for next launcher restart");
+
+                // 업데이트 정보를 JSON에 저장
+                var pendingUpdate = new PendingUpdate
+                {
+                    Command = _command,
+                    ScheduledTime = DateTime.Now,
+                    Description = $"LabView {_command.Version} 업데이트"
+                };
+
+                PendingUpdateManager.SavePendingUpdate(pendingUpdate);
+                SendStatusResponse("scheduled", $"Update scheduled for version {_command.Version}");
+                Console.WriteLine("[SCHEDULE] Update scheduled successfully. Will be applied on next restart.");
+            }
+            catch (Exception ex)
+            {
+                SendStatusResponse("schedule_error", ex.Message);
+                Console.WriteLine($"[SCHEDULE] Failed to schedule update: {ex.Message}");
+                _installStatusCallback?.Invoke("대기 중");
+            }
         }
 
         /// <summary>
@@ -266,6 +296,9 @@ namespace AppLauncher.Features.VersionManagement
                     _statusCallback($"setup.exe 발견: {setupExePath}");
                     Console.WriteLine($"[ZIP] Found setup.exe in Volume folder: {setupExePath}");
 
+                    // setup.exe 메타데이터 로그 출력
+                    // LogExecutableMetadata(setupExePath);
+
                     // PowerShell로 setup.exe 실행
                     ExecuteSetupWithPowerShell(setupExePath);
                 }
@@ -348,7 +381,7 @@ namespace AppLauncher.Features.VersionManagement
             try
             {
 
-                Console.WriteLine("=== AppLauncher Installation Start ===");
+                Console.WriteLine("=== LabView Installation Start ===");
                 Console.WriteLine($"Start Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                 Console.WriteLine($"Setup Path: {setupExePath}");
 
@@ -484,7 +517,7 @@ Write-Output $proc.Id
                         }
                     }
 
-                    Console.WriteLine("=== AppLauncher Installation DONE ===");
+                    Console.WriteLine("=== LabView Installation DONE ===");
                     if (exitCode != 0)
                     {
                         Console.WriteLine($"[FAILED] Installation failed (Exit Code: {exitCode})");
@@ -551,6 +584,35 @@ Write-Output $proc.Id
                 _statusCallback($"설치 실행 오류: {ex.Message}");
                 SendStatusResponse("error", ex.Message);
                 _installStatusCallback?.Invoke("대기 중");
+            }
+        }
+
+        /// <summary>
+        /// 실행 파일의 메타데이터 로그 출력
+        /// </summary>
+        private void LogExecutableMetadata(string exePath)
+        {
+            try
+            {
+                var versionInfo = FileVersionInfo.GetVersionInfo(exePath);
+
+                Console.WriteLine("=== Setup.exe 메타데이터 ===");
+                Console.WriteLine($"[METADATA] 파일 경로: {exePath}");
+                Console.WriteLine($"[METADATA] ProductName: {versionInfo.ProductName}");
+                Console.WriteLine($"[METADATA] CompanyName: {versionInfo.CompanyName}");
+                Console.WriteLine($"[METADATA] FileDescription: {versionInfo.FileDescription}");
+                Console.WriteLine($"[METADATA] FileVersion: {versionInfo.FileVersion}");
+                Console.WriteLine($"[METADATA] ProductVersion: {versionInfo.ProductVersion}");
+                Console.WriteLine($"[METADATA] InternalName: {versionInfo.InternalName}");
+                Console.WriteLine($"[METADATA] OriginalFilename: {versionInfo.OriginalFilename}");
+                Console.WriteLine($"[METADATA] LegalCopyright: {versionInfo.LegalCopyright}");
+                Console.WriteLine("============================");
+
+                _statusCallback($"설치 파일 정보: {versionInfo.ProductName} v{versionInfo.FileVersion}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[METADATA] 메타데이터 읽기 실패: {ex.Message}");
             }
         }
     }

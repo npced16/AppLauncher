@@ -131,14 +131,6 @@ namespace AppLauncher.Features.TrayApp
                 // 설정 로드
                 _config = ConfigManager.LoadConfig();
 
-                // 백그라운드에서 대상 프로그램 실행
-                _notifyIcon.Text = "App Launcher - 프로그램 실행 중...";
-                _applicationLauncher = new ApplicationLauncher();
-                await _applicationLauncher.CheckAndLaunchInBackgroundAsync(
-                    _config,
-                    UpdateTrayStatus
-                );
-
                 // MQTT 서비스 시작
                 if (_config.MqttSettings != null)
                 {
