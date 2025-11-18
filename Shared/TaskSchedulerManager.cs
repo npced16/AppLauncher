@@ -36,11 +36,18 @@ namespace AppLauncher.Shared
 
     /// <summary>
     /// 작업 스케줄러에 등록 (로그온 시 자동 실행, 관리자 권한)
+    /// Program Files의 정식 설치 경로만 등록
     /// </summary>
     public static bool RegisterTask(string exePath)
     {
       try
       {
+        // 항상 Program Files 경로 사용 (파라미터 무시)
+        string programFilesPath = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        string targetExePath = System.IO.Path.Combine(programFilesPath, "AppLauncher", "AppLauncher.exe");
+
+        Console.WriteLine($"[TaskScheduler] 작업 스케줄러 등록 경로: {targetExePath}");
+
         // XML 형식으로 작업 생성
         string xmlTask = $@"<?xml version=""1.0"" encoding=""UTF-16""?>
 <Task version=""1.2"" xmlns=""http://schemas.microsoft.com/windows/2004/02/mit/task"">
@@ -79,7 +86,7 @@ namespace AppLauncher.Shared
   </Settings>
   <Actions Context=""Author"">
     <Exec>
-      <Command>{exePath}</Command>
+      <Command>{targetExePath}</Command>
     </Exec>
   </Actions>
 </Task>";

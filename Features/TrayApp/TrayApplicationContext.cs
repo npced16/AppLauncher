@@ -1,16 +1,14 @@
 using System;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Drawing;
+using AppLauncher.Features.AppLaunching;
+using AppLauncher.Features.MqttControl;
 using AppLauncher.Presentation.WinForms;
 using AppLauncher.Shared;
 using AppLauncher.Shared.Configuration;
-using AppLauncher.Features.MqttControl;
-using AppLauncher.Features.AppLaunching;
-using AppLauncher.Features.VersionManagement;
-using Newtonsoft.Json;
 
 namespace AppLauncher.Features.TrayApp
 {
@@ -35,145 +33,13 @@ namespace AppLauncher.Features.TrayApp
 
         public TrayApplicationContext()
         {
-            DebugLog("[TrayApplicationContext] 생성자 시작");
-
-            // 구버전 파일 삭제
-            CleanupOldVersion();
-
-#if !DEBUG
-            // 자동 설치: Program Files가 아닌 곳에서 실행되면 자동으로 Program Files로 복사 (Release 모드에서만)
-            DebugLog("[TrayApplicationContext] CheckAndInstallToSystemPath 호출");
-            CheckAndInstallToSystemPath();
-#else
-            DebugLog("[TrayApplicationContext] Debug 모드 - 자동 설치 스킵");
-#endif
-
             DebugLog("[TrayApplicationContext] InitializeTrayIcon 호출");
             InitializeTrayIcon();
-
             DebugLog("[TrayApplicationContext] StartServices 호출");
             StartServices();
-
             DebugLog("[TrayApplicationContext] 생성자 완료");
         }
 
-        /// <summary>
-        /// 업데이트 후 남은 구버전 파일(.old) 삭제
-        /// </summary>
-        private void CleanupOldVersion()
-        {
-            try
-            {
-                string currentExePath = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName ?? "";
-                if (string.IsNullOrEmpty(currentExePath))
-                    return;
-
-                string oldFilePath = currentExePath + ".old";
-                if (File.Exists(oldFilePath))
-                {
-                    DebugLog($"[CLEANUP] 구버전 파일 발견: {oldFilePath}");
-
-                    // 파일 삭제 시도 (최대 3번)
-                    for (int i = 0; i < 3; i++)
-                    {
-                        try
-                        {
-                            File.Delete(oldFilePath);
-                            DebugLog($"[CLEANUP] 구버전 파일 삭제 완료");
-                            Console.WriteLine($"[CLEANUP] Old version file deleted: {oldFilePath}");
-                            break;
-                        }
-                        catch
-                        {
-                            if (i < 2)
-                            {
-                                System.Threading.Thread.Sleep(500);
-                            }
-                            else
-                            {
-                                DebugLog($"[CLEANUP] 구버전 파일 삭제 실패 (재부팅 시 삭제됨)");
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                DebugLog($"[CLEANUP] 오류: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Program Files가 아닌 곳에서 실행되면 자동으로 설치
-        /// </summary>
-        private void CheckAndInstallToSystemPath()
-        {
-            DebugLog("\n[설치] CheckAndInstallToSystemPath 시작");
-            try
-            {
-                string currentExePath = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName ?? "";
-                DebugLog($"[설치] 현재 실행 경로: {currentExePath}");
-
-                if (string.IsNullOrEmpty(currentExePath))
-                {
-                    DebugLog("[설치] 경로가 비어있음 - 종료");
-                    return;
-                }
-
-                string programFilesPath = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-                DebugLog($"[설치] Program Files 경로: {programFilesPath}");
-
-                string targetDir = Path.Combine(programFilesPath, "AppLauncher");
-                string targetExePath = Path.Combine(targetDir, "AppLauncher.exe");
-                DebugLog($"[설치] 목표 경로: {targetExePath}");
-
-                // 이미 Program Files에서 실행 중이면 스킵
-                if (currentExePath.Equals(targetExePath, StringComparison.OrdinalIgnoreCase))
-                {
-                    DebugLog("[설치] 이미 Program Files에서 실행 중 - 스킵");
-                    return;
-                }
-
-                DebugLog("[설치] Program Files로 복사 시작...");
-
-                // Program Files로 복사
-                if (!Directory.Exists(targetDir))
-                {
-                    DebugLog($"[설치] 디렉토리 생성: {targetDir}");
-                    Directory.CreateDirectory(targetDir);
-                }
-
-                DebugLog("[설치] 파일 복사 중...");
-                File.Copy(currentExePath, targetExePath, true);
-                DebugLog("[설치] 파일 복사 완료");
-
-                // Program Files 버전 실행하고 현재 프로세스 종료
-                DebugLog("[설치] Program Files 버전 실행...");
-                var startInfo = new ProcessStartInfo
-                {
-                    FileName = targetExePath,
-                    UseShellExecute = true
-                };
-                Process.Start(startInfo);
-
-                DebugLog("[설치] 현재 프로세스 종료");
-                Environment.Exit(0);
-            }
-            catch (Exception ex)
-            {
-                DebugLog($"[설치] 오류 발생: {ex.GetType().Name}");
-                DebugLog($"[설치] 오류 메시지: {ex.Message}");
-                DebugLog($"[설치] 스택 트레이스:\n{ex.StackTrace}");
-
-                // 설치 실패 - 사용자에게 알림
-                MessageBox.Show(
-                    $"Program Files 설치 실패:\n{ex.Message}\n\n현재 위치에서 계속 실행합니다.",
-                    "설치 실패",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning
-                );
-            }
-        }
 
         private void InitializeTrayIcon()
         {
@@ -183,7 +49,9 @@ namespace AppLauncher.Features.TrayApp
             try
             {
                 // 먼저 실행 파일의 아이콘 사용 시도
-                string exePath = Environment.ProcessPath ?? System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                string exePath =
+                    Environment.ProcessPath
+                    ?? System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
                 if (!string.IsNullOrEmpty(exePath))
                 {
                     appIcon = Icon.ExtractAssociatedIcon(exePath);
@@ -194,7 +62,10 @@ namespace AppLauncher.Features.TrayApp
                 // 실행 파일 아이콘 추출 실패시 파일에서 로드 시도
                 try
                 {
-                    string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app_icon.ico");
+                    string iconPath = Path.Combine(
+                        AppDomain.CurrentDomain.BaseDirectory,
+                        "app_icon.ico"
+                    );
                     if (File.Exists(iconPath))
                     {
                         appIcon = new Icon(iconPath);
@@ -217,7 +88,7 @@ namespace AppLauncher.Features.TrayApp
             {
                 Icon = appIcon,
                 Visible = true,
-                Text = "App Launcher"
+                Text = "App Launcher",
             };
 
             // 컨텍스트 메뉴 생성
@@ -263,7 +134,10 @@ namespace AppLauncher.Features.TrayApp
                 // 백그라운드에서 대상 프로그램 실행
                 _notifyIcon.Text = "App Launcher - 프로그램 실행 중...";
                 _applicationLauncher = new ApplicationLauncher();
-                await _applicationLauncher.CheckAndLaunchInBackgroundAsync(_config, UpdateTrayStatus);
+                await _applicationLauncher.CheckAndLaunchInBackgroundAsync(
+                    _config,
+                    UpdateTrayStatus
+                );
 
                 // MQTT 서비스 시작
                 if (_config.MqttSettings != null)
@@ -281,7 +155,7 @@ namespace AppLauncher.Features.TrayApp
             }
         }
 
-        private async System.Threading.Tasks.Task StartMqttServiceAsync()
+        private async Task StartMqttServiceAsync()
         {
             try
             {
@@ -300,7 +174,8 @@ namespace AppLauncher.Features.TrayApp
                     _config,
                     UpdateTrayStatus,
                     UpdateInstallStatus,
-                    _applicationLauncher
+                    _applicationLauncher,
+                    ShowBalloonTip
                 );
 
                 // 이벤트 핸들러 등록
@@ -351,7 +226,8 @@ namespace AppLauncher.Features.TrayApp
             if (_notifyIcon != null)
             {
                 // NotifyIcon.Text는 최대 63자까지만 지원
-                var truncatedMessage = message.Length > 63 ? message.Substring(0, 60) + "..." : message;
+                var truncatedMessage =
+                    message.Length > 63 ? message.Substring(0, 60) + "..." : message;
                 _notifyIcon.Text = $"App Launcher - {truncatedMessage}";
             }
         }
@@ -364,17 +240,27 @@ namespace AppLauncher.Features.TrayApp
                 var parent = _installStatusMenuItem.GetCurrentParent();
                 if (parent?.InvokeRequired == true)
                 {
-                    parent.Invoke(new Action(() =>
-                    {
-                        _installStatusMenuItem.Text = $"상태: {status}";
-                        _installStatusMenuItem.Enabled = status != "대기 중";
-                    }));
+                    parent.Invoke(
+                        new Action(() =>
+                        {
+                            _installStatusMenuItem.Text = $"상태: {status}";
+                            _installStatusMenuItem.Enabled = status != "대기 중";
+                        })
+                    );
                 }
                 else
                 {
                     _installStatusMenuItem.Text = $"상태: {status}";
                     _installStatusMenuItem.Enabled = status != "대기 중";
                 }
+            }
+        }
+
+        private void ShowBalloonTip(string title, string message, int timeout)
+        {
+            if (_notifyIcon != null)
+            {
+                _notifyIcon.ShowBalloonTip(timeout, title, message, ToolTipIcon.Info);
             }
         }
 

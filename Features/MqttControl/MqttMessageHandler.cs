@@ -23,19 +23,22 @@ namespace AppLauncher.Features.MqttControl
         private readonly Action<string> _statusCallback;
         private readonly Action<string>? _installStatusCallback;
         private readonly ApplicationLauncher? _applicationLauncher;
+        private readonly Action<string, string, int>? _showBalloonTipCallback;
 
         public MqttMessageHandler(
             MqttService mqttService,
             LauncherConfig config,
             Action<string> statusCallback,
             Action<string>? installStatusCallback = null,
-            ApplicationLauncher? applicationLauncher = null)
+            ApplicationLauncher? applicationLauncher = null,
+            Action<string, string, int>? showBalloonTipCallback = null)
         {
             _mqttService = mqttService ?? throw new ArgumentNullException(nameof(mqttService));
             _config = config ?? throw new ArgumentNullException(nameof(config));
             _statusCallback = statusCallback ?? throw new ArgumentNullException(nameof(statusCallback));
             _installStatusCallback = installStatusCallback;
             _applicationLauncher = applicationLauncher;
+            _showBalloonTipCallback = showBalloonTipCallback;
         }
 
         /// <summary>
@@ -288,20 +291,25 @@ namespace AppLauncher.Features.MqttControl
 
                 if (updatedPath != null)
                 {
-                    _statusCallback("업데이트 완료. 재시작합니다...");
+                    _statusCallback("업데이트 완료");
 
-                    await Task.Delay(2000);
+                    // 토스트 알림 표시 (5초 동안)
+                    _showBalloonTipCallback?.Invoke(
+                        "런처 업데이트 완료",
+                        "업데이트가 완료되었습니다.\n컴퓨터를 재시작하면 새 버전이 적용됩니다.",
+                        5000
+                    );
 
-                    // 새 버전 실행
-                    var startInfo = new ProcessStartInfo
-                    {
-                        FileName = updatedPath,
-                        UseShellExecute = true
-                    };
-                    Process.Start(startInfo);
+                    // 새 버전 실행 ( 다음 컴퓨터 재실행시 자동으로 새버전 이 실행되도록 )
+                    // var startInfo = new ProcessStartInfo
+                    // {
+                    //     FileName = updatedPath,
+                    //     UseShellExecute = true
+                    // };
+                    // Process.Start(startInfo);
 
-                    // 현재 앱 종료
-                    System.Windows.Forms.Application.Exit();
+                    // 현재 앱 종료 안함 - 컴퓨터 재시작시 자동으로 새 버전 실행됨
+                    // System.Windows.Forms.Application.Exit();
                 }
                 else
                 {

@@ -6,6 +6,7 @@ using System.Windows.Forms;
 using Microsoft.Win32;
 using AppLauncher.Features.TrayApp;
 using AppLauncher.Shared;
+using System.IO;
 
 namespace AppLauncher
 {
@@ -20,6 +21,130 @@ namespace AppLauncher
 #endif
         }
 
+        /// <summary>
+        /// 업데이트 후 남은 구버전 파일(.old) 삭제
+        /// </summary>
+        private static void CleanupOldVersion()
+        {
+            try
+            {
+                string currentExePath = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                if (string.IsNullOrEmpty(currentExePath))
+                    return;
+
+                string oldFilePath = currentExePath + ".old";
+                if (File.Exists(oldFilePath))
+                {
+                    DebugLog($"[CLEANUP] 구버전 파일 발견: {oldFilePath}");
+
+                    // 파일 삭제 시도 (최대 3번)
+                    for (int i = 0; i < 3; i++)
+                    {
+                        try
+                        {
+                            File.Delete(oldFilePath);
+                            DebugLog($"[CLEANUP] 구버전 파일 삭제 완료");
+                            Console.WriteLine($"[CLEANUP] Old version file deleted: {oldFilePath}");
+                            break;
+                        }
+                        catch
+                        {
+                            if (i < 2)
+                            {
+                                System.Threading.Thread.Sleep(500);
+                            }
+                            else
+                            {
+                                DebugLog($"[CLEANUP] 구버전 파일 삭제 실패 (재부팅 시 삭제됨)");
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLog($"[CLEANUP] 오류: {ex.Message}");
+            }
+        }
+        /// <summary>
+        /// Program Files가 아닌 곳에서 실행되면 자동으로 설치
+        /// </summary>
+        private static void CheckAndInstallToSystemPath()
+        {
+            DebugLog("\n[설치] CheckAndInstallToSystemPath 시작");
+            try
+            {
+                string currentExePath =
+                    Environment.ProcessPath
+                    ?? Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                DebugLog($"[설치] 현재 실행 경로: {currentExePath}");
+
+                if (string.IsNullOrEmpty(currentExePath))
+                {
+                    DebugLog("[설치] 경로가 비어있음 - 종료");
+                    return;
+                }
+
+                string programFilesPath = Environment.GetFolderPath(
+                    Environment.SpecialFolder.ProgramFiles
+                );
+                DebugLog($"[설치] Program Files 경로: {programFilesPath}");
+
+                string targetDir = Path.Combine(programFilesPath, "AppLauncher");
+                string targetExePath = Path.Combine(targetDir, "AppLauncher.exe");
+                DebugLog($"[설치] 목표 경로: {targetExePath}");
+
+                // 이미 Program Files에서 실행 중이면 스킵
+                if (currentExePath.Equals(targetExePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    DebugLog("[설치] 이미 Program Files에서 실행 중 - 스킵");
+                    return;
+                }
+
+                DebugLog("[설치] Program Files로 복사 시작...");
+
+                // Program Files로 복사
+                if (!Directory.Exists(targetDir))
+                {
+                    DebugLog($"[설치] 디렉토리 생성: {targetDir}");
+                    Directory.CreateDirectory(targetDir);
+                }
+
+                DebugLog("[설치] 파일 복사 중...");
+                File.Copy(currentExePath, targetExePath, true);
+                DebugLog("[설치] 파일 복사 완료");
+
+                // Program Files 버전 실행하고 현재 프로세스 종료
+                // 작업 스케줄러 등록은 Program.cs에서 처리
+                DebugLog("[설치] Program Files 버전 실행...");
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = targetExePath,
+                    UseShellExecute = true,
+                };
+                Process.Start(startInfo);
+
+                DebugLog("[설치] 현재 프로세스 종료");
+                Environment.Exit(0);
+            }
+            catch (Exception ex)
+            {
+                DebugLog($"[설치] 오류 발생: {ex.GetType().Name}");
+                DebugLog($"[설치] 오류 메시지: {ex.Message}");
+                DebugLog($"[설치] 스택 트레이스:\n{ex.StackTrace}");
+
+                // 설치 실패 - 사용자에게 알림
+                MessageBox.Show(
+                    $"Program Files 설치 실패:\n{ex.Message}\n\n현재 위치에서 계속 실행합니다.",
+                    "설치 실패",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                );
+            }
+        }
+
+
+
         [STAThread]
         static void Main()
         {
@@ -28,6 +153,19 @@ namespace AppLauncher
 #endif
             // 중복 실행 방지
             DebugLog("\n[Main] 중복 실행 체크...");
+
+
+            // 구버전 파일 삭제
+            CleanupOldVersion();
+
+#if !DEBUG
+            // 자동 설치: Program Files가 아닌 곳에서 실행되면 자동으로 Program Files로 복사 (Release 모드에서만)
+            DebugLog("[Program] CheckAndInstallToSystemPath 호출");
+            CheckAndInstallToSystemPath();
+#else
+            DebugLog("[Program] Debug 모드 - 자동 설치 스킵");
+#endif
+
             const string mutexName = "Global\\AppLauncher_SingleInstance";
             bool createdNew;
             _mutex = new Mutex(true, mutexName, out createdNew);
@@ -142,6 +280,7 @@ namespace AppLauncher
                 // 오류 무시
             }
         }
+
 
         public static void UnregisterStartup()
         {
