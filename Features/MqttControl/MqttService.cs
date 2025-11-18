@@ -183,7 +183,6 @@ namespace AppLauncher.Features.MqttControl
             // 송신 메시지 로그 출력 (JSON 형태로)
             LogMessage?.Invoke($"[메시지 송신] 토픽: {topic}");
 
-            // JSON 파싱 시도 후 예쁘게 출력
             try
             {
                 var jsonObj = JsonConvert.DeserializeObject(payload);
@@ -312,7 +311,5 @@ namespace AppLauncher.Features.MqttControl
         [JsonProperty("location")]
         public string? Location { get; set; }
 
-        [JsonProperty("processId")]
-        public int? ProcessId { get; set; }
     }
 }

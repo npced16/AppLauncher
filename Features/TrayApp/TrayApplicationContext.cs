@@ -37,6 +37,9 @@ namespace AppLauncher.Features.TrayApp
         {
             DebugLog("[TrayApplicationContext] 생성자 시작");
 
+            // 구버전 파일 삭제
+            CleanupOldVersion();
+
 #if !DEBUG
             // 자동 설치: Program Files가 아닌 곳에서 실행되면 자동으로 Program Files로 복사 (Release 모드에서만)
             DebugLog("[TrayApplicationContext] CheckAndInstallToSystemPath 호출");
@@ -52,6 +55,52 @@ namespace AppLauncher.Features.TrayApp
             StartServices();
 
             DebugLog("[TrayApplicationContext] 생성자 완료");
+        }
+
+        /// <summary>
+        /// 업데이트 후 남은 구버전 파일(.old) 삭제
+        /// </summary>
+        private void CleanupOldVersion()
+        {
+            try
+            {
+                string currentExePath = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                if (string.IsNullOrEmpty(currentExePath))
+                    return;
+
+                string oldFilePath = currentExePath + ".old";
+                if (File.Exists(oldFilePath))
+                {
+                    DebugLog($"[CLEANUP] 구버전 파일 발견: {oldFilePath}");
+
+                    // 파일 삭제 시도 (최대 3번)
+                    for (int i = 0; i < 3; i++)
+                    {
+                        try
+                        {
+                            File.Delete(oldFilePath);
+                            DebugLog($"[CLEANUP] 구버전 파일 삭제 완료");
+                            Console.WriteLine($"[CLEANUP] Old version file deleted: {oldFilePath}");
+                            break;
+                        }
+                        catch
+                        {
+                            if (i < 2)
+                            {
+                                System.Threading.Thread.Sleep(500);
+                            }
+                            else
+                            {
+                                DebugLog($"[CLEANUP] 구버전 파일 삭제 실패 (재부팅 시 삭제됨)");
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLog($"[CLEANUP] 오류: {ex.Message}");
+            }
         }
 
         /// <summary>
