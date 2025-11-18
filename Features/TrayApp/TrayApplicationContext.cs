@@ -229,7 +229,7 @@ namespace AppLauncher.Features.TrayApp
 
             contextMenu.Items.Add(new ToolStripSeparator());
 
-            var launcherSettingsMenuItem = new ToolStripMenuItem("런처 설정");
+            var launcherSettingsMenuItem = new ToolStripMenuItem("설정");
             launcherSettingsMenuItem.Click += ShowLauncherSettingsWindow;
             contextMenu.Items.Add(launcherSettingsMenuItem);
 
@@ -239,18 +239,11 @@ namespace AppLauncher.Features.TrayApp
 
             contextMenu.Items.Add(new ToolStripSeparator());
 
-            // 현재 버전 표시 (비활성화)
-            var versionMenuItem = new ToolStripMenuItem($"버전: {AppLauncher.Shared.VersionInfo.LAUNCHER_VERSION}");
-            versionMenuItem.Enabled = false;
-            contextMenu.Items.Add(versionMenuItem);
-
             // 설치 상태 메뉴 항목 (평소 비활성화)
             _installStatusMenuItem = new ToolStripMenuItem("상태: 대기 중");
             _installStatusMenuItem.Enabled = false;
             contextMenu.Items.Add(_installStatusMenuItem);
-
             contextMenu.Items.Add(new ToolStripSeparator());
-
             var exitMenuItem = new ToolStripMenuItem("종료");
             exitMenuItem.Click += Exit;
             contextMenu.Items.Add(exitMenuItem);

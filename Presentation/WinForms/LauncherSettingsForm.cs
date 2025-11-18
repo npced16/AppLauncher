@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
+using AppLauncher.Shared;
 using AppLauncher.Shared.Configuration;
 
 namespace AppLauncher.Presentation.WinForms
@@ -19,6 +20,7 @@ namespace AppLauncher.Presentation.WinForms
         private Button resetButton;
         private Button saveButton;
         private Button cancelButton;
+        private Label versionLabel;
 
         public LauncherSettingsForm()
         {
@@ -28,8 +30,8 @@ namespace AppLauncher.Presentation.WinForms
 
         private void InitializeComponent()
         {
-            this.Text = "런처 설정";
-            this.Size = new Size(600, 350);
+            this.Text = "설정";
+            this.Size = new Size(600, 370);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -136,6 +138,16 @@ namespace AppLauncher.Presentation.WinForms
             };
             cancelButton.Click += (s, e) => this.Close();
             this.Controls.Add(cancelButton);
+
+            // Version Label
+            versionLabel = new Label
+            {
+                Text = $"런처 버전: {VersionInfo.LAUNCHER_VERSION}",
+                Location = new Point(20, 300),
+                Size = new Size(200, 20),
+                ForeColor = Color.Gray
+            };
+            this.Controls.Add(versionLabel);
         }
 
         private void LoadSettings()
