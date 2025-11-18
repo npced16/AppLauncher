@@ -43,6 +43,14 @@ namespace AppLauncher.Features.VersionManagement
 
                 Console.WriteLine($"[UPDATE] 다운로드 완료: {tempFile}");
 
+                // 다운로드한 파일 검증
+                if (!ValidateExecutable(tempFile))
+                {
+                    Console.WriteLine("[UPDATE] 파일 검증 실패 - 같은 프로그램이 아닙니다");
+                    File.Delete(tempFile);
+                    return null;
+                }
+
                 Console.WriteLine($"[UPDATE] 파일 교체 시작: {targetExePath}");
 
                 // 목표 디렉토리 생성
@@ -106,6 +114,75 @@ namespace AppLauncher.Features.VersionManagement
             }
             catch
             {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 다운로드한 exe 파일이 같은 프로그램인지 검증
+        /// </summary>
+        private bool ValidateExecutable(string downloadedExePath)
+        {
+            try
+            {
+                // 현재 실행 중인 exe 파일 경로
+                string currentExePath = Environment.ProcessPath ??
+                    System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
+
+                if (string.IsNullOrEmpty(currentExePath))
+                {
+                    Console.WriteLine("[VALIDATE] 현재 실행 파일 경로를 찾을 수 없습니다");
+                    return false;
+                }
+
+                // 현재 exe의 메타데이터
+                var currentVersion = FileVersionInfo.GetVersionInfo(currentExePath);
+                // 다운로드한 exe의 메타데이터
+                var downloadedVersion = FileVersionInfo.GetVersionInfo(downloadedExePath);
+
+                Console.WriteLine($"[VALIDATE] 현재 프로그램:");
+                Console.WriteLine($"  - ProductName: {currentVersion.ProductName}");
+                Console.WriteLine($"  - CompanyName: {currentVersion.CompanyName}");
+                Console.WriteLine($"  - InternalName: {currentVersion.InternalName}");
+                Console.WriteLine($"  - OriginalFilename: {currentVersion.OriginalFilename}");
+
+                Console.WriteLine($"[VALIDATE] 다운로드한 파일:");
+                Console.WriteLine($"  - ProductName: {downloadedVersion.ProductName}");
+                Console.WriteLine($"  - CompanyName: {downloadedVersion.CompanyName}");
+                Console.WriteLine($"  - InternalName: {downloadedVersion.InternalName}");
+                Console.WriteLine($"  - OriginalFilename: {downloadedVersion.OriginalFilename}");
+
+                // ProductName 비교 (가장 중요)
+                if (currentVersion.ProductName != downloadedVersion.ProductName)
+                {
+                    Console.WriteLine($"[VALIDATE] ProductName 불일치: '{currentVersion.ProductName}' != '{downloadedVersion.ProductName}'");
+                    return false;
+                }
+
+                // InternalName 비교
+                if (!string.IsNullOrEmpty(currentVersion.InternalName) &&
+                    !string.IsNullOrEmpty(downloadedVersion.InternalName) &&
+                    currentVersion.InternalName != downloadedVersion.InternalName)
+                {
+                    Console.WriteLine($"[VALIDATE] InternalName 불일치: '{currentVersion.InternalName}' != '{downloadedVersion.InternalName}'");
+                    return false;
+                }
+
+                // OriginalFilename 비교
+                if (!string.IsNullOrEmpty(currentVersion.OriginalFilename) &&
+                    !string.IsNullOrEmpty(downloadedVersion.OriginalFilename) &&
+                    currentVersion.OriginalFilename != downloadedVersion.OriginalFilename)
+                {
+                    Console.WriteLine($"[VALIDATE] OriginalFilename 불일치: '{currentVersion.OriginalFilename}' != '{downloadedVersion.OriginalFilename}'");
+                    return false;
+                }
+
+                Console.WriteLine("[VALIDATE] 검증 성공 - 같은 프로그램입니다");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[VALIDATE] 검증 중 오류: {ex.Message}");
                 return false;
             }
         }
