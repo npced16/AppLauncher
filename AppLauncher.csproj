@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
     <TargetFramework>net9.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
@@ -11,8 +10,18 @@
 
     <!-- CA1416 경고 억제 (Windows 전용 앱) -->
     <NoWarn>CA1416</NoWarn>
+  </PropertyGroup>
 
-    <!-- Self-contained 빌드 크기 최적화 (WinForms 전용) -->
+  <!-- Debug 빌드 설정 -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <!-- Release 빌드 전용 설정 -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <OutputType>WinExe</OutputType>
+
+    <!-- Self-contained 빌드 크기 최적화 -->
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>

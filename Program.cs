@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Win32;
@@ -14,9 +13,6 @@ namespace AppLauncher
     {
         private static Mutex? _mutex;
 
-        [DllImport("kernel32.dll")]
-        static extern bool AllocConsole();
-
         private static void DebugLog(string message)
         {
 #if DEBUG
@@ -28,8 +24,6 @@ namespace AppLauncher
         static void Main()
         {
 #if DEBUG
-            // 디버깅용 콘솔 표시
-            AllocConsole();
             Console.WriteLine("=== AppLauncher 시작 ===");
 #endif
             // 중복 실행 방지

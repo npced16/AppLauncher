@@ -360,10 +360,20 @@ namespace AppLauncher.Features.MqttControl
                 string logFilePath = Path.Combine(logDir, $"install_log_{DateTime.Now:yyyyMMddHHmmss}.txt");
                 Console.WriteLine($"Log file path: {logFilePath}");
 
-                // powershell - Command "Start-Process '.\setup.exe' -ArgumentList '/q','/AcceptLicenses','yes','/log','C:\install_log_TS.txt' -Verb RunAs ㅋ; 
+                // PowerShell 명령어 구성
+                // ArgumentList 옵션:
+                //   '/q'              : Quiet mode (UI 없이 자동 설치)
+                //   '/AcceptLicenses' : 라이선스 자동 동의
+                //   'yes'             : AcceptLicenses 값
+                //   '/log'            : 설치 로그 기록
+                //   '{logFilePath}'   : 로그 파일 저장 경로
+                // Start-Process 옵션:
+                //   -Verb RunAs       : 관리자 권한으로 실행
+                //   -PassThru         : 프로세스 객체 반환 (exit code 확인용)
+                //   -Wait             : 설치 완료까지 대기
                 string psCommand = $@"
 # Setup.exe 실행
-$proc = Start-Process '{setupExePath}'  -ArgumentList '/q','/AcceptLicenses','yes','/log','{logFilePath}' -Verb RunAs  -PassThru -Wait
+$proc = Start-Process '{setupExePath}' -ArgumentList '/q','/AcceptLicenses','yes','/log','{logFilePath}' -Verb RunAs -PassThru -Wait
 
 # Exit code 확인
 $exitCode = $proc.ExitCode
@@ -381,16 +391,24 @@ Write-Output $proc.Id
                 var bytes = System.Text.Encoding.Unicode.GetBytes(psCommand);
                 var encodedCommand = Convert.ToBase64String(bytes);
 
+
+
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = "powershell.exe",
-                    Arguments = $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedCommand}",
+                    Arguments = $"-Command \"{psCommand}\"",
+                    // Arguments = $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedCommand}",
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     WorkingDirectory = Path.GetDirectoryName(setupExePath)
                 };
+
+
+                // 설치 전 setting.ini 파일 백업
+                var backupSettingFile = BackupSettingFile();
+
 
                 var psProcess = Process.Start(startInfo);
                 if (psProcess != null)
@@ -459,18 +477,26 @@ Write-Output $proc.Id
 
                     if (exitCode != 0)
                     {
+
                         Console.WriteLine($"[FAILED] Installation failed (Exit Code: {exitCode})");
                         Console.WriteLine($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                         _statusCallback($"설치 실패 (종료 코드: {exitCode})");
                         SendStatusResponse("install_failed", $"Exit code: {exitCode}");
                         _installStatusCallback?.Invoke("대기 중");
                         return;
+
+                    }
+                    else
+                    {
+
+                        Console.WriteLine($"[SUCCESS] Installation completed");
+                        Console.WriteLine($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                        _statusCallback($"설치 완료 (종료 코드: {exitCode})");
+                        SendStatusResponse("install_success", $"Exit code: {exitCode}");
+                        RestoreSettingFile(backupSettingFile);
+
                     }
 
-                    Console.WriteLine($"[SUCCESS] Installation completed");
-                    Console.WriteLine($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                    _statusCallback($"설치 완료 (종료 코드: {exitCode})");
-                    SendStatusResponse("install_success", $"Exit code: {exitCode}");
                 }
                 else
                 {
@@ -620,20 +646,6 @@ Write-Output $proc.Id
                     return;
                 }
 
-                // 현재 런처 버전 가져오기 (코드에 내장된 버전)
-                string currentVersion = VersionInfo.LAUNCHER_VERSION;
-                string incomingVersion = command.Version;
-
-                bool needsUpdate = CompareVersions(currentVersion, incomingVersion);
-
-                if (!needsUpdate)
-                {
-                    _installStatusCallback?.Invoke("대기 중");
-                    return;
-                }
-
-                _statusCallback($"새 버전 감지: {currentVersion} -> {incomingVersion}");
-                SendStatusResponse("update_required", $"버전 업데이트 필요: {currentVersion} -> {incomingVersion}");
                 _installStatusCallback?.Invoke("런처 업데이트 중");
 
                 // Program Files 경로로 고정
@@ -643,11 +655,8 @@ Write-Output $proc.Id
                     "AppLauncher.exe"
                 );
 
-                string versionFile = _config.LauncherVersionFile ??
-                    Path.Combine(Path.GetDirectoryName(ConfigManager.GetConfigFilePath()) ?? "", "launcher_version.txt");
-
                 _statusCallback($"새 버전 {command.Version} 다운로드 중...");
-                await UpdateLauncherAsync(command.URL, command.Version, targetExePath, versionFile);
+                await UpdateLauncherAsync(command.URL, command.Version, targetExePath);
             }
             catch (Exception ex)
             {
@@ -666,22 +675,15 @@ Write-Output $proc.Id
             {
                 if (string.IsNullOrEmpty(command.Location))
                 {
-                    Console.WriteLine("[MQTT] Location change failed: Location is empty");
-                    _statusCallback("Location 변경 실패: Location이 비어있음");
                     SendStatusResponse("error", "Location is empty");
                     return;
                 }
-
-                Console.WriteLine($"[MQTT] Changing location to: {command.Location}");
-                _statusCallback($"Location 변경 중: {command.Location}");
 
                 // 현재 설정 로드
                 var config = ConfigManager.LoadConfig();
 
                 if (config.MqttSettings == null)
                 {
-                    Console.WriteLine("[MQTT] Location change failed: MQTT settings not found");
-                    _statusCallback("Location 변경 실패: MQTT 설정을 찾을 수 없음");
                     SendStatusResponse("error", "MQTT settings not found");
                     return;
                 }
@@ -690,52 +692,21 @@ Write-Output $proc.Id
                 string oldLocation = config.MqttSettings.Location ?? "미설정";
                 config.MqttSettings.Location = command.Location;
 
-                // 설정 저장
-                ConfigManager.SaveConfig(config);
-
-                Console.WriteLine($"[MQTT] Location changed: {oldLocation} -> {command.Location}");
-                _statusCallback($"Location 변경 완료: {oldLocation} -> {command.Location}");
-
                 // 변경된 상태 전송
                 SendStatus("changeLocation");
                 SendStatusResponse("location_changed", $"Location changed from '{oldLocation}' to '{command.Location}'");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[MQTT] Location change error: {ex.Message}");
-                _statusCallback($"Location 변경 오류: {ex.Message}");
                 SendStatusResponse("error", ex.Message);
             }
         }
 
-        /// <summary>
-        /// 버전 비교: 수신한 버전이 현재 버전보다 높으면 true 반환
-        /// </summary>
-        private bool CompareVersions(string currentVersion, string incomingVersion)
-        {
-            try
-            {
-                // Version 클래스를 사용한 비교
-                if (Version.TryParse(currentVersion, out Version? current) &&
-                    Version.TryParse(incomingVersion, out Version? incoming))
-                {
-                    return incoming > current;
-                }
-
-                // 파싱 실패시 문자열 비교
-                return string.Compare(incomingVersion, currentVersion, StringComparison.OrdinalIgnoreCase) > 0;
-            }
-            catch
-            {
-                // 비교 실패시 업데이트 필요한 것으로 간주
-                return true;
-            }
-        }
 
         /// <summary>
         /// 런처 업데이트 실행
         /// </summary>
-        private async Task UpdateLauncherAsync(string downloadUrl, string newVersion, string currentExePath, string versionFile)
+        private async Task UpdateLauncherAsync(string downloadUrl, string newVersion, string currentExePath)
         {
             try
             {
@@ -743,7 +714,7 @@ Write-Output $proc.Id
 
                 var updater = new BackgroundUpdater(
                     downloadUrl,
-                    versionFile
+                    ""
                 );
 
                 // 업데이트 파일 다운로드 및 교체
