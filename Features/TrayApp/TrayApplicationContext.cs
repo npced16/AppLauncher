@@ -21,7 +21,6 @@ namespace AppLauncher.Features.TrayApp
         private MqttService? _mqttService;
         private MqttMessageHandler? _mqttMessageHandler;
         private LauncherConfig? _config;
-        private ToolStripMenuItem? _installStatusMenuItem;
         private ApplicationLauncher? _applicationLauncher;
 
         private static void DebugLog(string message)
@@ -110,11 +109,6 @@ namespace AppLauncher.Features.TrayApp
 
             contextMenu.Items.Add(new ToolStripSeparator());
 
-            // 설치 상태 메뉴 항목 (평소 비활성화)
-            _installStatusMenuItem = new ToolStripMenuItem("상태: 대기 중");
-            _installStatusMenuItem.Enabled = false;
-            contextMenu.Items.Add(_installStatusMenuItem);
-            contextMenu.Items.Add(new ToolStripSeparator());
             var exitMenuItem = new ToolStripMenuItem("종료");
             exitMenuItem.Click += Exit;
             contextMenu.Items.Add(exitMenuItem);
@@ -126,7 +120,6 @@ namespace AppLauncher.Features.TrayApp
         {
             try
             {
-                _notifyIcon!.Text = "App Launcher - 초기화 중...";
 
                 // 설정 로드
                 _config = ConfigManager.LoadConfig();
@@ -134,15 +127,12 @@ namespace AppLauncher.Features.TrayApp
                 // MQTT 서비스 시작
                 if (_config.MqttSettings != null)
                 {
-                    _notifyIcon.Text = "App Launcher - MQTT 연결 중...";
                     await StartMqttServiceAsync();
                 }
 
-                _notifyIcon.Text = "App Launcher - 대기 중";
             }
             catch (Exception ex)
             {
-                _notifyIcon!.Text = $"App Launcher - 오류: {ex.Message}";
                 _notifyIcon.ShowBalloonTip(3000, "오류", ex.Message, ToolTipIcon.Error);
             }
         }
@@ -164,8 +154,6 @@ namespace AppLauncher.Features.TrayApp
                 _mqttMessageHandler = new MqttMessageHandler(
                     _mqttService,
                     _config,
-                    UpdateTrayStatus,
-                    UpdateInstallStatus,
                     _applicationLauncher,
                     ShowBalloonTip
                 );
@@ -177,8 +165,6 @@ namespace AppLauncher.Features.TrayApp
 
                 // MQTT 브로커 연결
                 await _mqttService.ConnectAsync();
-
-                UpdateTrayStatus("MQTT 연결됨");
             }
             catch (Exception ex)
             {
@@ -187,7 +173,6 @@ namespace AppLauncher.Features.TrayApp
                 {
                     errorDetail += $"\n상세: {ex.InnerException.Message}";
                 }
-                UpdateTrayStatus($"MQTT 오류");
             }
         }
 
@@ -195,57 +180,14 @@ namespace AppLauncher.Features.TrayApp
         {
             if (isConnected)
             {
-                UpdateTrayStatus("MQTT 연결됨");
-
                 // 연결 성공 시 초기 상태 전송
                 _mqttMessageHandler?.SendStatus("connected");
-            }
-            else
-            {
-                UpdateTrayStatus("MQTT 연결 끊김");
             }
         }
 
         private void OnMqttLogMessage(string message)
         {
-            // 로그 메시지를 트레이 상태로 업데이트
-            UpdateTrayStatus(message);
             System.Diagnostics.Debug.WriteLine($"[MQTT] {message}");
-        }
-
-        private void UpdateTrayStatus(string message)
-        {
-            if (_notifyIcon != null)
-            {
-                // NotifyIcon.Text는 최대 63자까지만 지원
-                var truncatedMessage =
-                    message.Length > 63 ? message.Substring(0, 60) + "..." : message;
-                _notifyIcon.Text = $"App Launcher - {truncatedMessage}";
-            }
-        }
-
-        private void UpdateInstallStatus(string status)
-        {
-            if (_installStatusMenuItem != null)
-            {
-                // UI 스레드에서 실행되도록 보장
-                var parent = _installStatusMenuItem.GetCurrentParent();
-                if (parent?.InvokeRequired == true)
-                {
-                    parent.Invoke(
-                        new Action(() =>
-                        {
-                            _installStatusMenuItem.Text = $"상태: {status}";
-                            _installStatusMenuItem.Enabled = status != "대기 중";
-                        })
-                    );
-                }
-                else
-                {
-                    _installStatusMenuItem.Text = $"상태: {status}";
-                    _installStatusMenuItem.Enabled = status != "대기 중";
-                }
-            }
         }
 
         private void ShowBalloonTip(string title, string message, int timeout)
@@ -283,7 +225,6 @@ namespace AppLauncher.Features.TrayApp
                     _launcherSettingsForm = null;
                     // 설정이 변경되었을 수 있으므로 다시 로드
                     _config = ConfigManager.LoadConfig();
-                    UpdateTrayStatus("설정이 업데이트되었습니다");
                 };
                 _launcherSettingsForm.Show();
             }
@@ -317,8 +258,6 @@ namespace AppLauncher.Features.TrayApp
         {
             try
             {
-                UpdateTrayStatus("종료 중...");
-
                 // 모든 열려있는 폼 닫기
                 if (_mainForm != null && !_mainForm.IsDisposed)
                 {
@@ -336,7 +275,6 @@ namespace AppLauncher.Features.TrayApp
                 // MQTT 연결 해제
                 if (_mqttService != null && _mqttService.IsConnected)
                 {
-                    UpdateTrayStatus("MQTT 연결 해제 중...");
                     await _mqttService.DisconnectAsync();
                     await Task.Delay(500); // MQTT 연결 해제 대기
                 }

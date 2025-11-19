@@ -20,23 +20,17 @@ namespace AppLauncher.Features.MqttControl
     {
         private readonly MqttService _mqttService;
         private readonly LauncherConfig _config;
-        private readonly Action<string> _statusCallback;
-        private readonly Action<string>? _installStatusCallback;
         private readonly ApplicationLauncher? _applicationLauncher;
         private readonly Action<string, string, int>? _showBalloonTipCallback;
 
         public MqttMessageHandler(
             MqttService mqttService,
             LauncherConfig config,
-            Action<string> statusCallback,
-            Action<string>? installStatusCallback = null,
             ApplicationLauncher? applicationLauncher = null,
             Action<string, string, int>? showBalloonTipCallback = null)
         {
             _mqttService = mqttService ?? throw new ArgumentNullException(nameof(mqttService));
             _config = config ?? throw new ArgumentNullException(nameof(config));
-            _statusCallback = statusCallback ?? throw new ArgumentNullException(nameof(statusCallback));
-            _installStatusCallback = installStatusCallback;
             _applicationLauncher = applicationLauncher;
             _showBalloonTipCallback = showBalloonTipCallback;
         }
@@ -48,8 +42,6 @@ namespace AppLauncher.Features.MqttControl
         {
             try
             {
-                _statusCallback($"메시지 수신: {message.Topic}");
-
                 // JSON 메시지 파싱
                 var command = JsonConvert.DeserializeObject<LaunchCommand>(message.Payload);
 
@@ -82,13 +74,12 @@ namespace AppLauncher.Features.MqttControl
                         break;
 
                     default:
-                        _statusCallback($"알 수 없는 명령: {command.Command}");
                         break;
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                _statusCallback($"메시지 처리 오류: {ex.Message}");
+                // 메시지 처리 오류 무시
             }
         }
 
@@ -102,12 +93,9 @@ namespace AppLauncher.Features.MqttControl
                 // url이 있으면 업데이트 예약 및 런처 재시작
                 if (!string.IsNullOrEmpty(command.URL))
                 {
-                    _statusCallback("업데이트 예약 중...");
                     var LabViewUpdater = new LabViewUpdater(
                         command,
                         _config,
-                        _statusCallback,
-                        _installStatusCallback,
                         SendStatusResponse
                      );
 
@@ -118,7 +106,6 @@ namespace AppLauncher.Features.MqttControl
             }
             catch (Exception ex)
             {
-                _statusCallback($"실행 오류: {ex.Message}");
                 SendStatusResponse("error", ex.Message);
             }
         }
@@ -168,19 +155,17 @@ namespace AppLauncher.Features.MqttControl
                 await _mqttService.PublishJsonAsync(_mqttService.StatusTopic, status);
 
                 Console.WriteLine($"[MQTT] Status sent ({statusMessage}) - Launcher: {launcherVersion}, App: {targetAppVersion}");
-                _statusCallback($"상태 전송 완료 ({statusMessage}) (런처: {launcherVersion}, 앱: {targetAppVersion})");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[MQTT] Status send error: {ex.Message}");
-                _statusCallback($"상태 전송 오류: {ex.Message}");
             }
         }
 
         /// <summary>
         /// 상태 응답 전송
         /// </summary>
-        private async void SendStatusResponse(string status, string message)
+        public async void SendStatusResponse(string status, string message)
         {
             try
             {
@@ -211,27 +196,17 @@ namespace AppLauncher.Features.MqttControl
         {
             try
             {
-                _statusCallback("MQTT 명령: 런처 업데이트 확인");
-                _installStatusCallback?.Invoke("버전 확인 중");
-
                 // MQTT 명령에서 다운로드 URL과 버전 정보 확인
                 if (string.IsNullOrWhiteSpace(command.URL))
                 {
-                    _installStatusCallback?.Invoke("업데이트 실패: URL 누락");
                     return;
                 }
-                _installStatusCallback?.Invoke("런처 업데이트 중");
 
-
-
-                _statusCallback($"새 버전 {command.Version} 다운로드 중...");
                 await UpdateLauncherAsync(command.URL);
             }
             catch (Exception ex)
             {
-                _statusCallback($"런처 업데이트 실패: {ex.Message}");
                 SendStatusResponse("error", ex.Message);
-                _installStatusCallback?.Invoke("대기 중");
             }
         }
 
@@ -279,8 +254,6 @@ namespace AppLauncher.Features.MqttControl
         {
             try
             {
-                _statusCallback("런처 업데이트 다운로드 중...");
-
                 var updater = new LauncherUpdater(
                     downloadUrl
                 );
@@ -290,8 +263,6 @@ namespace AppLauncher.Features.MqttControl
 
                 if (updatedPath != null)
                 {
-                    _statusCallback("업데이트 완료");
-
                     // 토스트 알림 표시 (5초 동안)
                     _showBalloonTipCallback?.Invoke(
                         "런처 업데이트 완료",
@@ -310,14 +281,10 @@ namespace AppLauncher.Features.MqttControl
                     // 현재 앱 종료 안함 - 컴퓨터 재시작시 자동으로 새 버전 실행됨
                     // System.Windows.Forms.Application.Exit();
                 }
-                else
-                {
-                    _statusCallback("업데이트 실패");
-                }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                _statusCallback($"업데이트 오류: {ex.Message}");
+                // 업데이트 오류 무시
             }
         }
 

@@ -134,32 +134,6 @@ namespace AppLauncher.Presentation.WinForms
         {
             try
             {
-                // 상태 콜백
-                Action<string> statusCallback = (status) =>
-                {
-                    if (InvokeRequired)
-                    {
-                        Invoke(new Action(() => UpdateStatus(status)));
-                    }
-                    else
-                    {
-                        UpdateStatus(status);
-                    }
-                };
-
-                // 설치 상태 콜백
-                Action<string>? installStatusCallback = (status) =>
-                {
-                    if (InvokeRequired)
-                    {
-                        Invoke(new Action(() => UpdateInstallStatus(status)));
-                    }
-                    else
-                    {
-                        UpdateInstallStatus(status);
-                    }
-                };
-
                 // 응답 콜백
                 Action<string, string> sendStatusResponse = (status, message) =>
                 {
@@ -170,8 +144,6 @@ namespace AppLauncher.Presentation.WinForms
                 var updater = new LabViewUpdater(
                     _pendingUpdate.Command,
                     _config,
-                    statusCallback,
-                    installStatusCallback,
                     sendStatusResponse
                 );
 

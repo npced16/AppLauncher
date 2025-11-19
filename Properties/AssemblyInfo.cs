@@ -7,5 +7,5 @@ using System.Reflection;
 [assembly: AssemblyDescription("IBEX MEDICAL SYSTEMS의 응용 프로그램 런처_자동 시작 및 관리 도구")]
 
 // 어셈블리 버전 정보
-[assembly: AssemblyVersion("1.0.1.1")]
-[assembly: AssemblyFileVersion("1.0.1.1")]
+[assembly: AssemblyVersion("1.0.1.2")]
+[assembly: AssemblyFileVersion("1.0.1.2")]

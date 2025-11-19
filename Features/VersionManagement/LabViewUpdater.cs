@@ -15,30 +15,16 @@ namespace AppLauncher.Features.VersionManagement
     {
         private readonly LaunchCommand _command;
         private readonly LauncherConfig _config;
-        private readonly Action<string> _statusCallback;
-        private readonly Action<string>? _installStatusCallback;
-        private readonly Action<string, string> _sendStatusResponse;
 
         public LabViewUpdater(
             LaunchCommand command,
-            LauncherConfig config,
-            Action<string> statusCallback,
-            Action<string>? installStatusCallback,
-            Action<string, string> sendStatusResponse
+            LauncherConfig config
         )
         {
             _command = command;
             _config = config;
-            _statusCallback = statusCallback;
-            _installStatusCallback = installStatusCallback;
-            _sendStatusResponse = sendStatusResponse;
         }
 
-
-        private void SendStatusResponse(string status, string message)
-        {
-            _sendStatusResponse(status, message);
-        }
 
         /// <summary>
         /// 업데이트를 예약 (다음 런처 재시작 시 자동 실행)
@@ -58,14 +44,11 @@ namespace AppLauncher.Features.VersionManagement
                 };
 
                 PendingUpdateManager.SavePendingUpdate(pendingUpdate);
-                SendStatusResponse("scheduled", $"Update scheduled for version {_command.Version}");
                 Console.WriteLine("[SCHEDULE] Update scheduled successfully. Will be applied on next restart.");
             }
             catch (Exception ex)
             {
-                SendStatusResponse("schedule_error", ex.Message);
                 Console.WriteLine($"[SCHEDULE] Failed to schedule update: {ex.Message}");
-                _installStatusCallback?.Invoke("대기 중");
             }
         }
 
@@ -83,7 +66,6 @@ namespace AppLauncher.Features.VersionManagement
                 if (!File.Exists(settingFilePath))
                 {
                     Console.WriteLine($"[BACKUP] setting.ini not found: {settingFilePath}");
-                    _statusCallback("setting.ini 파일이 없어 백업을 건너뜁니다.");
                     return null;
                 }
 
@@ -102,16 +84,12 @@ namespace AppLauncher.Features.VersionManagement
                 File.Copy(settingFilePath, backupFilePath, overwrite: true);
 
                 Console.WriteLine($"[BACKUP] Setting file backed up: {backupFilePath}");
-                _statusCallback($"설정 파일 백업 완료: {backupFilePath}");
-                SendStatusResponse("setting_backup", backupFilePath);
 
                 return backupFilePath;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[BACKUP] Failed to backup setting file: {ex.Message}");
-                _statusCallback($"설정 파일 백업 실패: {ex.Message}");
-                SendStatusResponse("backup_error", ex.Message);
                 return null;
             }
         }
@@ -126,7 +104,6 @@ namespace AppLauncher.Features.VersionManagement
                 if (string.IsNullOrEmpty(backupFilePath) || !File.Exists(backupFilePath))
                 {
                     Console.WriteLine($"[RESTORE] No backup file to restore");
-                    _statusCallback("복원할 백업 파일이 없습니다.");
                     return;
                 }
 
@@ -145,8 +122,6 @@ namespace AppLauncher.Features.VersionManagement
                 File.Copy(backupFilePath, settingFilePath, overwrite: true);
 
                 Console.WriteLine($"[RESTORE] Setting file restored: {settingFilePath}");
-                _statusCallback($"설정 파일 복원 완료: {settingFilePath}");
-                SendStatusResponse("setting_restore", settingFilePath);
 
                 // 백업 파일 삭제 (선택사항)
                 // File.Delete(backupFilePath);
@@ -154,8 +129,6 @@ namespace AppLauncher.Features.VersionManagement
             catch (Exception ex)
             {
                 Console.WriteLine($"[RESTORE] Failed to restore setting file: {ex.Message}");
-                _statusCallback($"설정 파일 복원 실패: {ex.Message}");
-                SendStatusResponse("restore_error", ex.Message);
             }
         }
 
@@ -168,9 +141,6 @@ namespace AppLauncher.Features.VersionManagement
         {
             try
             {
-                _statusCallback("파일 다운로드 중...");
-                _installStatusCallback?.Invoke("다운로드 중");
-
                 // 다운로드 디렉토리 생성 (C:\ProgramData\AppLauncher\Downloads)
                 string programDataPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
                 string tempDir = Path.Combine(programDataPath, "AppLauncher", "Downloads");
@@ -205,13 +175,8 @@ namespace AppLauncher.Features.VersionManagement
 
                 if (!File.Exists(downloadPath))
                 {
-                    _statusCallback("다운로드 실패");
-                    SendStatusResponse("error", "Download failed");
-                    _installStatusCallback?.Invoke("대기 중");
                     return "";
                 }
-
-                _statusCallback($"다운로드 완료: {Path.GetFileName(downloadPath)}");
 
                 // zip 파일이면 압축 해제
                 if (isZipFile)
@@ -228,9 +193,6 @@ namespace AppLauncher.Features.VersionManagement
             }
             catch (Exception ex)
             {
-                _statusCallback($"다운로드 오류: {ex.Message}");
-                SendStatusResponse("error", ex.Message);
-                _installStatusCallback?.Invoke("대기 중");
                 return "";
             }
         }
@@ -242,10 +204,6 @@ namespace AppLauncher.Features.VersionManagement
         {
             try
             {
-                _statusCallback("압축 해제 중...");
-                _installStatusCallback?.Invoke("압축 해제 중");
-                SendStatusResponse("extracting", zipFilePath);
-
 
                 // 압축 해제 대상 디렉토리 결정
                 string extractDir;
@@ -259,14 +217,12 @@ namespace AppLauncher.Features.VersionManagement
                     Directory.CreateDirectory(extractDir);
                 }
 
-                _statusCallback($"압축 해제 위치: {extractDir}");
                 Console.WriteLine($"[ZIP] Extracting to: {extractDir}");
 
                 // 기존 Volume 폴더가 있으면 삭제
                 string volumeDir = Path.Combine(extractDir, "Volume");
                 if (Directory.Exists(volumeDir))
                 {
-                    _statusCallback("기존 Volume 폴더 삭제 중...");
                     Console.WriteLine($"[ZIP] Deleting existing Volume folder: {volumeDir}");
                     Directory.Delete(volumeDir, recursive: true);
                 }
@@ -277,16 +233,13 @@ namespace AppLauncher.Features.VersionManagement
                     ZipFile.ExtractToDirectory(zipFilePath, extractDir, overwriteFiles: true);
                 });
 
-                _statusCallback($"압축 해제 완료: {extractDir}");
                 Console.WriteLine($"[ZIP] Extraction completed: {extractDir}");
-                SendStatusResponse("extract_success", extractDir);
 
                 // Volume 폴더 안의 setup.exe 찾기
                 string setupExePath = Path.Combine(volumeDir, "setup.exe");
 
                 if (File.Exists(setupExePath))
                 {
-                    _statusCallback($"setup.exe 발견: {setupExePath}");
                     Console.WriteLine($"[ZIP] Found setup.exe in Volume folder: {setupExePath}");
 
                     // setup.exe 메타데이터 로그 출력
@@ -297,18 +250,12 @@ namespace AppLauncher.Features.VersionManagement
                 }
                 else
                 {
-                    _statusCallback("압축 해제 완료. Volume 폴더에서 setup.exe를 찾을 수 없어 자동 실행하지 않습니다.");
                     Console.WriteLine($"[ZIP] setup.exe not found in {volumeDir}");
-                    SendStatusResponse("extract_complete_no_setup", volumeDir);
-                    _installStatusCallback?.Invoke("대기 중");
                 }
             }
             catch (Exception ex)
             {
-                _statusCallback($"압축 해제 오류: {ex.Message}");
                 Console.WriteLine($"[ZIP] Extraction error: {ex.Message}");
-                SendStatusResponse("extract_error", ex.Message);
-                _installStatusCallback?.Invoke("대기 중");
             }
         }
 
@@ -343,20 +290,9 @@ namespace AppLauncher.Features.VersionManagement
                 }
 
                 Process.Start(startInfo);
-
-                _statusCallback($"프로그램 실행: {Path.GetFileName(executable)}");
-
-                // 상태 응답 전송
-                SendStatusResponse("launched", executable);
-
-                // 일반 프로그램 실행 후 대기 중으로 복귀
-                _installStatusCallback?.Invoke("대기 중");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                _statusCallback($"실행 오류: {ex.Message}");
-                SendStatusResponse("error", ex.Message);
-                _installStatusCallback?.Invoke("대기 중");
             }
         }
 
@@ -371,13 +307,6 @@ namespace AppLauncher.Features.VersionManagement
                 Console.WriteLine("=== LabView Installation Start ===");
                 Console.WriteLine($"Start Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                 Console.WriteLine($"Setup Path: {setupExePath}");
-
-                _statusCallback("LabView 설치 시작...");
-                _installStatusCallback?.Invoke("설치 중");
-
-
-
-                SendStatusResponse("install_start", $"Setup.exe 실행 시작: {setupExePath}");
 
                 // 로그 파일 경로 생성
                 string programDataPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
@@ -461,8 +390,6 @@ Write-Output $proc.Id
                     if (!completed)
                     {
                         Console.WriteLine($"[TIMEOUT] Installation timeout after {timeoutMinutes} minutes");
-                        _statusCallback($"설치 타임아웃 ({timeoutMinutes}분 초과)");
-                        SendStatusResponse("install_timeout", $"Timeout after {timeoutMinutes} minutes");
 
                         try
                         {
@@ -470,7 +397,6 @@ Write-Output $proc.Id
                         }
                         catch { }
 
-                        _installStatusCallback?.Invoke("대기 중");
                         return;
                     }
 
@@ -495,12 +421,10 @@ Write-Output $proc.Id
                         else if (line == "WaitingCleanup")
                         {
                             Console.WriteLine("Waiting for cleanup (20 seconds)...");
-                            _statusCallback("설치 완료, 정리 중 (20초 대기)...");
                         }
                         else if (line == "CleanupComplete")
                         {
                             Console.WriteLine("Cleanup wait completed");
-                            _statusCallback("정리 완료");
                         }
                     }
 
@@ -509,9 +433,6 @@ Write-Output $proc.Id
                     {
                         Console.WriteLine($"[FAILED] Installation failed (Exit Code: {exitCode})");
                         Console.WriteLine($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                        _statusCallback($"설치 실패 (종료 코드: {exitCode})");
-                        SendStatusResponse("install_failed", $"Exit code: {exitCode}");
-                        _installStatusCallback?.Invoke("대기 중");
                         return;
 
                     }
@@ -520,8 +441,6 @@ Write-Output $proc.Id
 
                         Console.WriteLine($"[SUCCESS] Installation completed");
                         Console.WriteLine($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                        _statusCallback($"설치 완료 (종료 코드: {exitCode})");
-                        SendStatusResponse("install_success", $"Exit code: {exitCode}");
                         RestoreSettingFile(backupSettingFile);
 
                     }
@@ -531,9 +450,6 @@ Write-Output $proc.Id
                 {
                     Console.WriteLine("[ERROR] Failed to start PowerShell process");
                     Console.WriteLine($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                    _statusCallback("PowerShell 프로세스 시작 실패");
-                    SendStatusResponse("error", "Failed to start PowerShell process");
-                    _installStatusCallback?.Invoke("대기 중");
                     return;
                 }
 
@@ -549,28 +465,19 @@ Write-Output $proc.Id
                         }
                         File.WriteAllText(_config.LocalVersionFile, _command.Version);
                         Console.WriteLine($"Version file saved: {_command.Version}");
-                        _statusCallback($"버전 {_command.Version} 저장 완료");
-                        SendStatusResponse("version_saved", $"버전 파일 저장: {_command.Version}");
                     }
                     catch (Exception versionEx)
                     {
                         Console.WriteLine($"Failed to save version file: {versionEx.Message}");
-                        SendStatusResponse("version_save_error", versionEx.Message);
                     }
                 }
 
-                _statusCallback("LabView 설치 완료");
-                _installStatusCallback?.Invoke("대기 중");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[EXCEPTION] {ex.Message}");
                 Console.WriteLine($"Stack Trace:\n{ex.StackTrace}");
                 Console.WriteLine($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-
-                _statusCallback($"설치 실행 오류: {ex.Message}");
-                SendStatusResponse("error", ex.Message);
-                _installStatusCallback?.Invoke("대기 중");
             }
         }
 
@@ -595,7 +502,6 @@ Write-Output $proc.Id
                 Console.WriteLine($"[METADATA] LegalCopyright: {versionInfo.LegalCopyright}");
                 Console.WriteLine("============================");
 
-                _statusCallback($"설치 파일 정보: {versionInfo.ProductName} v{versionInfo.FileVersion}");
             }
             catch (Exception ex)
             {
