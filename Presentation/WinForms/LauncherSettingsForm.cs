@@ -12,7 +12,6 @@ namespace AppLauncher.Presentation.WinForms
         private LauncherConfig _config;
 
         private TextBox targetExecutableTextBox;
-        private TextBox localVersionFileTextBox;
 
         private Button browseExecutableButton;
         private Button resetButton;
@@ -29,7 +28,7 @@ namespace AppLauncher.Presentation.WinForms
         private void InitializeComponent()
         {
             this.Text = "설정";
-            this.Size = new Size(600, 370);
+            this.Size = new Size(600, 250);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -62,31 +61,11 @@ namespace AppLauncher.Presentation.WinForms
             browseExecutableButton.Click += BrowseExecutableButton_Click;
             this.Controls.Add(browseExecutableButton);
 
-
-
-            // Local Version File Label
-            var versionFileLabel = new Label
-            {
-                Text = "버전 파일:",
-                Location = new Point(20, 150),
-                Size = new Size(120, 20)
-            };
-            this.Controls.Add(versionFileLabel);
-
-            // Local Version File TextBox
-            localVersionFileTextBox = new TextBox
-            {
-                Location = new Point(20, 175),
-                Size = new Size(450, 25),
-                Text = "version.txt"
-            };
-            this.Controls.Add(localVersionFileTextBox);
-
             // Reset Button
             resetButton = new Button
             {
                 Text = "기본값 초기화",
-                Location = new Point(20, 250),
+                Location = new Point(20, 120),
                 Size = new Size(120, 35)
             };
             resetButton.Click += ResetButton_Click;
@@ -96,7 +75,7 @@ namespace AppLauncher.Presentation.WinForms
             saveButton = new Button
             {
                 Text = "저장",
-                Location = new Point(380, 250),
+                Location = new Point(380, 120),
                 Size = new Size(80, 35)
             };
             saveButton.Click += SaveButton_Click;
@@ -106,7 +85,7 @@ namespace AppLauncher.Presentation.WinForms
             cancelButton = new Button
             {
                 Text = "취소",
-                Location = new Point(480, 250),
+                Location = new Point(480, 120),
                 Size = new Size(80, 35)
             };
             cancelButton.Click += (s, e) => this.Close();
@@ -116,7 +95,7 @@ namespace AppLauncher.Presentation.WinForms
             versionLabel = new Label
             {
                 Text = $"런처 버전: {VersionInfo.LAUNCHER_VERSION}",
-                Location = new Point(20, 300),
+                Location = new Point(20, 170),
                 Size = new Size(200, 20),
                 ForeColor = Color.Gray
             };
@@ -131,7 +110,6 @@ namespace AppLauncher.Presentation.WinForms
 
                 // 현재 설정 표시
                 targetExecutableTextBox.Text = _config.TargetExecutable ?? "";
-                localVersionFileTextBox.Text = _config.LocalVersionFile ?? "version.txt";
             }
             catch (Exception ex)
             {
@@ -183,7 +161,7 @@ namespace AppLauncher.Presentation.WinForms
 
                 // 설정 저장
                 _config.TargetExecutable = targetExecutableTextBox.Text.Trim();
-                _config.LocalVersionFile = localVersionFileTextBox.Text.Trim();
+                // LocalVersionFile은 기본값 유지
 
                 ConfigManager.SaveConfig(_config);
 
