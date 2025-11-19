@@ -158,9 +158,13 @@ namespace AppLauncher
             // 중복 실행 방지
             DebugLog("\n[Main] 중복 실행 체크...");
 
-
             // 구버전 파일 삭제
             CleanupOldVersion();
+
+            // 1년 이상 된 로그 파일 삭제
+            DebugLog("[CLEANUP] 로그 파일 정리 시작...");
+            LabViewUpdater.CleanupOldLogFiles();
+            DebugLog("[CLEANUP] 로그 파일 정리 완료");
 
 #if !DEBUG
             // 자동 설치: Program Files가 아닌 곳에서 실행되면 자동으로 Program Files로 복사 (Release 모드에서만)

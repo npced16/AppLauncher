@@ -165,7 +165,7 @@ namespace AppLauncher.Features.MqttControl
         /// <summary>
         /// 상태 응답 전송
         /// </summary>
-        public async void SendStatusResponse(string status, string message)
+        private async void SendStatusResponse(string status, string message)
         {
             try
             {

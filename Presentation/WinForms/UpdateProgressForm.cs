@@ -20,12 +20,44 @@ namespace AppLauncher.Presentation.WinForms
         private LauncherConfig _config = null!;
         private bool _updateCompleted = false;
         private bool _updateSuccess = false;
+        private Timer? _progressTimer;
+        private int _targetProgress = 0;
 
         public UpdateProgressForm(PendingUpdate pendingUpdate, LauncherConfig config)
         {
             _pendingUpdate = pendingUpdate;
             _config = config;
             InitializeComponent();
+            InitializeProgressAnimation();
+        }
+
+        private void InitializeProgressAnimation()
+        {
+            _progressTimer = new Timer
+            {
+                Interval = 20 // 20ms마다 업데이트 (부드러운 애니메이션)
+            };
+            _progressTimer.Tick += ProgressTimer_Tick;
+        }
+
+        private void ProgressTimer_Tick(object? sender, EventArgs e)
+        {
+            if (progressBar.Value < _targetProgress)
+            {
+                // 현재 값과 목표 값의 차이에 따라 증가량 조정
+                int diff = _targetProgress - progressBar.Value;
+                int increment = Math.Max(1, diff / 10); // 최소 1, 최대 차이의 1/10씩 증가
+
+                progressBar.Value = Math.Min(progressBar.Value + increment, _targetProgress);
+            }
+            else if (progressBar.Value > _targetProgress)
+            {
+                progressBar.Value = _targetProgress;
+            }
+            else
+            {
+                _progressTimer?.Stop();
+            }
         }
 
         private void InitializeComponent()
@@ -137,7 +169,8 @@ namespace AppLauncher.Presentation.WinForms
                 // 응답 콜백
                 Action<string, string> sendStatusResponse = (status, message) =>
                 {
-                    Console.WriteLine($"[UPDATE_RESPONSE] {status}: {message}");
+                    UpdateInstallStatus(status);
+
                 };
 
                 // LabViewUpdater 생성
@@ -253,25 +286,56 @@ namespace AppLauncher.Presentation.WinForms
 
         private void UpdateInstallStatus(string status)
         {
-            if (status == "다운로드 중")
+            switch (status)
             {
-                UpdateProgress(20);
-            }
-            else if (status == "압축 해제 중")
-            {
-                UpdateProgress(40);
-            }
-            else if (status == "설치 중")
-            {
-                UpdateProgress(60);
-            }
-            else if (status == "대기 중")
-            {
-                // 설치 완료 후 대기 중이면 80%
-                if (progressBar.Value < 80)
-                {
-                    UpdateProgress(80);
-                }
+                case "download_started":
+                    UpdateStatus("설치 파일 다운로드 시작...");
+                    UpdateProgress(10);
+                    break;
+
+                case "download_complete":
+                    UpdateStatus("설치 파일 다운로드 완료");
+                    UpdateProgress(30);
+                    break;
+
+                case "extract_start":
+                    UpdateStatus("압축 해제 중...");
+                    UpdateProgress(40);
+                    break;
+
+                case "extract_done":
+                    UpdateStatus("압축 해제 완료");
+                    UpdateProgress(50);
+                    break;
+
+                case "installation_start":
+                    UpdateStatus("설치 중...");
+                    UpdateProgress(60);
+                    break;
+
+                case "installation_complete":
+                    UpdateStatus("설치 완료");
+                    UpdateProgress(70);
+                    break;
+
+                case "restore_start":
+                    UpdateStatus("환경 설정 중...");
+                    UpdateProgress(75);
+                    break;
+
+                case "restore_done":
+                    UpdateStatus("환경 설정 완료");
+                    UpdateProgress(85);
+                    break;
+
+                case "version_saved":
+                    UpdateStatus("설치 완료");
+                    UpdateProgress(95);
+                    break;
+
+                default:
+                    Console.WriteLine($"[UPDATE] Unknown status: {status}");
+                    break;
             }
         }
 
@@ -279,7 +343,8 @@ namespace AppLauncher.Presentation.WinForms
         {
             if (value >= 0 && value <= 100)
             {
-                progressBar.Value = value;
+                _targetProgress = value;
+                _progressTimer?.Start();
             }
         }
     }
