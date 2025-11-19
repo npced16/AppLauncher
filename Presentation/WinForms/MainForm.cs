@@ -123,13 +123,8 @@ namespace AppLauncher.Presentation.WinForms
                     UseShellExecute = true
                 };
 
-                // 작업 디렉토리 설정
-                string workingDir = _config.WorkingDirectory ?? "";
-                if (string.IsNullOrEmpty(workingDir))
-                {
-                    workingDir = Path.GetDirectoryName(_config.TargetExecutable) ?? "";
-                }
-
+                // 작업 디렉토리는 실행 파일의 디렉토리로 자동 설정
+                string workingDir = Path.GetDirectoryName(_config.TargetExecutable) ?? "";
                 if (!string.IsNullOrEmpty(workingDir) && Directory.Exists(workingDir))
                 {
                     startInfo.WorkingDirectory = workingDir;

@@ -47,7 +47,7 @@ namespace AppLauncher.Features.AppLaunching
                 statusCallback("프로그램 실행 중...");
                 await Task.Delay(500);
 
-                bool launchSuccess = LaunchTargetApplication(config.TargetExecutable, config.WorkingDirectory, statusCallback);
+                bool launchSuccess = LaunchTargetApplication(config.TargetExecutable, statusCallback);
 
                 if (launchSuccess)
                 {
@@ -67,7 +67,7 @@ namespace AppLauncher.Features.AppLaunching
             }
         }
 
-        private bool LaunchTargetApplication(string executable, string? workingDirectory, Action<string> statusCallback)
+        private bool LaunchTargetApplication(string executable, Action<string> statusCallback)
         {
             try
             {
@@ -83,16 +83,11 @@ namespace AppLauncher.Features.AppLaunching
                     UseShellExecute = true
                 };
 
-                // workingDirectory가 없으면 실행 파일이 있는 디렉토리를 자동으로 사용
-                string finalWorkingDir = workingDirectory ?? "";
-                if (string.IsNullOrWhiteSpace(finalWorkingDir))
+                // 작업 디렉토리는 실행 파일의 디렉토리로 자동 설정
+                string workingDir = Path.GetDirectoryName(executable) ?? "";
+                if (!string.IsNullOrWhiteSpace(workingDir) && Directory.Exists(workingDir))
                 {
-                    finalWorkingDir = Path.GetDirectoryName(executable) ?? "";
-                }
-
-                if (!string.IsNullOrWhiteSpace(finalWorkingDir) && Directory.Exists(finalWorkingDir))
-                {
-                    startInfo.WorkingDirectory = finalWorkingDir;
+                    startInfo.WorkingDirectory = workingDir;
                 }
 
                 var process = Process.Start(startInfo);

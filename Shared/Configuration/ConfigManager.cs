@@ -97,7 +97,6 @@ namespace AppLauncher.Shared.Configuration
             return new LauncherConfig
             {
                 TargetExecutable = @"C:\Program Files (x86)\HBOT Operator\HBOT Operator.exe",
-                WorkingDirectory = "", // 비워두면 실행 파일 디렉토리를 자동으로 사용
                 LocalVersionFile = Path.Combine(appFolder, "labview_version.txt"),  // LabView 버전
                 MqttSettings = new MqttSettings
                 {
@@ -115,13 +114,6 @@ namespace AppLauncher.Shared.Configuration
         /// </summary>
         [JsonProperty("targetExecutable")]
         public string TargetExecutable { get; set; } = "";
-
-        /// <summary>
-        /// 대상 프로그램의 작업 디렉토리 (선택사항, 비워두면 실행 파일 디렉토리 자동 사용)
-        /// </summary>
-        [JsonProperty("workingDirectory")]
-        public string? WorkingDirectory { get; set; }
-
 
         /// <summary>
         /// LabView/대상 앱 버전 파일 경로 (labview_version.txt)

@@ -12,11 +12,9 @@ namespace AppLauncher.Presentation.WinForms
         private LauncherConfig _config;
 
         private TextBox targetExecutableTextBox;
-        private TextBox workingDirectoryTextBox;
         private TextBox localVersionFileTextBox;
 
         private Button browseExecutableButton;
-        private Button browseDirectoryButton;
         private Button resetButton;
         private Button saveButton;
         private Button cancelButton;
@@ -64,15 +62,7 @@ namespace AppLauncher.Presentation.WinForms
             browseExecutableButton.Click += BrowseExecutableButton_Click;
             this.Controls.Add(browseExecutableButton);
 
-            // Browse Directory Button
-            browseDirectoryButton = new Button
-            {
-                Text = "찾아보기",
-                Location = new Point(480, 108),
-                Size = new Size(80, 27)
-            };
-            browseDirectoryButton.Click += BrowseDirectoryButton_Click;
-            this.Controls.Add(browseDirectoryButton);
+
 
             // Local Version File Label
             var versionFileLabel = new Label
@@ -141,7 +131,6 @@ namespace AppLauncher.Presentation.WinForms
 
                 // 현재 설정 표시
                 targetExecutableTextBox.Text = _config.TargetExecutable ?? "";
-                workingDirectoryTextBox.Text = _config.WorkingDirectory ?? "";
                 localVersionFileTextBox.Text = _config.LocalVersionFile ?? "version.txt";
             }
             catch (Exception ex)
@@ -165,24 +154,7 @@ namespace AppLauncher.Presentation.WinForms
             }
         }
 
-        private void BrowseDirectoryButton_Click(object? sender, EventArgs e)
-        {
-            using (var dialog = new FolderBrowserDialog())
-            {
-                dialog.Description = "작업 디렉토리 선택";
-                dialog.ShowNewFolderButton = true;
 
-                if (!string.IsNullOrWhiteSpace(workingDirectoryTextBox.Text) && Directory.Exists(workingDirectoryTextBox.Text))
-                {
-                    dialog.SelectedPath = workingDirectoryTextBox.Text;
-                }
-
-                if (dialog.ShowDialog() == DialogResult.OK)
-                {
-                    workingDirectoryTextBox.Text = dialog.SelectedPath;
-                }
-            }
-        }
 
         private void SaveButton_Click(object? sender, EventArgs e)
         {
@@ -209,24 +181,8 @@ namespace AppLauncher.Presentation.WinForms
                     }
                 }
 
-                // 작업 디렉토리 검증 (선택사항)
-                if (!string.IsNullOrWhiteSpace(workingDirectoryTextBox.Text) && !Directory.Exists(workingDirectoryTextBox.Text))
-                {
-                    var result = MessageBox.Show(
-                        "지정한 작업 디렉토리가 존재하지 않습니다.\n그래도 저장하시겠습니까?",
-                        "디렉토리 없음",
-                        MessageBoxButtons.YesNo,
-                        MessageBoxIcon.Warning);
-
-                    if (result != DialogResult.Yes)
-                    {
-                        return;
-                    }
-                }
-
                 // 설정 저장
                 _config.TargetExecutable = targetExecutableTextBox.Text.Trim();
-                _config.WorkingDirectory = workingDirectoryTextBox.Text.Trim();
                 _config.LocalVersionFile = localVersionFileTextBox.Text.Trim();
 
                 ConfigManager.SaveConfig(_config);

@@ -250,16 +250,9 @@ namespace AppLauncher.Features.VersionManagement
                 // 압축 해제 대상 디렉토리 결정
                 string extractDir;
 
-                // config에 WorkingDirectory가 설정되어 있으면 사용
-                if (!string.IsNullOrEmpty(_config.WorkingDirectory) && Directory.Exists(_config.WorkingDirectory))
-                {
-                    extractDir = _config.WorkingDirectory;
-                }
-                else
-                {
-                    // 없으면 zip 파일과 같은 폴더에 바로 압축 해제
-                    extractDir = Path.GetDirectoryName(zipFilePath) ?? Path.GetTempPath();
-                }
+                // zip 파일과 같은 폴더에 바로 압축 해제
+                extractDir = Path.GetDirectoryName(zipFilePath) ?? Path.GetTempPath();
+
                 // 압축 해제 디렉토리가 없으면 생성
                 if (!Directory.Exists(extractDir))
                 {
@@ -341,15 +334,9 @@ namespace AppLauncher.Features.VersionManagement
                     FileName = executable,
                     UseShellExecute = true
                 };
-                // 작업 디렉토리 자동 설정: config > executable이 있는 디렉토리
-                string workingDir = _config.WorkingDirectory ?? "";
 
-                // workingDir이 없으면 실행 파일이 있는 디렉토리를 자동으로 사용
-                if (string.IsNullOrEmpty(workingDir))
-                {
-                    workingDir = Path.GetDirectoryName(executable) ?? "";
-                }
-
+                // 작업 디렉토리는 실행 파일의 디렉토리로 자동 설정
+                string workingDir = Path.GetDirectoryName(executable) ?? "";
                 if (!string.IsNullOrEmpty(workingDir) && Directory.Exists(workingDir))
                 {
                     startInfo.WorkingDirectory = workingDir;
