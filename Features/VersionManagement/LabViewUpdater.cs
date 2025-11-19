@@ -45,7 +45,7 @@ namespace AppLauncher.Features.VersionManagement
                 {
                     Command = _command,
                     ScheduledTime = DateTime.Now,
-                    Description = $"LabView {_command.Version} 업데이트"
+                    Description = $"챔버 소프트웨어 {_command.Version} 업데이트"
                 };
 
                 PendingUpdateManager.SavePendingUpdate(pendingUpdate);
@@ -246,6 +246,30 @@ namespace AppLauncher.Features.VersionManagement
                 });
 
                 Console.WriteLine($"[ZIP] Extraction completed: {extractDir}");
+
+
+                string HBOTOperatorPath = Path.Combine(extractDir, "HBOT Operator.exe");
+                if (File.Exists(HBOTOperatorPath))
+                {
+                    Console.WriteLine($"[ZIP] Found HBOT Operator.exe: {HBOTOperatorPath}");
+
+                    // 메타데이터 검증
+                    if (!ValidateExecutableMetadata(HBOTOperatorPath, "HBOT Operator", "Ibex Medical Systems"))
+                    {
+                        Console.WriteLine($"[ZIP] HBOT Operator.exe validation failed - executing file directly");
+                        _sendStatusResponse?.Invoke("validation_failed", "파일 검증 실패 - 파일 실행");
+
+                        // 검증 실패 시 HBOT Operator.exe 실행
+                        ExecuteProgram(HBOTOperatorPath);
+                        return;
+                    }
+                    Console.WriteLine($"[ZIP] HBOT Operator.exe validation successful - proceeding with setup.exe");
+                }
+                else
+                {
+                    Console.WriteLine($"[ZIP] HBOT Operator.exe not found in {extractDir}");
+                    return;
+                }
 
                 // Volume 폴더 안의 setup.exe 찾기
                 string setupExePath = Path.Combine(volumeDir, "setup.exe");
@@ -793,15 +817,15 @@ Write-Output ""CleanupComplete""
         }
 
         /// <summary>
-        /// 실행 파일의 메타데이터 로그 출력
+        /// 실행 파일의 메타데이터 검증
         /// </summary>
-        private void LogExecutableMetadata(string exePath)
+        private bool ValidateExecutableMetadata(string exePath, string expectedProductName, string expectedCompanyName)
         {
             try
             {
                 var versionInfo = FileVersionInfo.GetVersionInfo(exePath);
 
-                Console.WriteLine("=== Setup.exe 메타데이터 ===");
+                Console.WriteLine("=== Executable 메타데이터 검증 ===");
                 Console.WriteLine($"[METADATA] 파일 경로: {exePath}");
                 Console.WriteLine($"[METADATA] ProductName: {versionInfo.ProductName}");
                 Console.WriteLine($"[METADATA] CompanyName: {versionInfo.CompanyName}");
@@ -813,10 +837,19 @@ Write-Output ""CleanupComplete""
                 Console.WriteLine($"[METADATA] LegalCopyright: {versionInfo.LegalCopyright}");
                 Console.WriteLine("============================");
 
+                // ProductName과 CompanyName 검증
+                bool productNameMatch = string.Equals(versionInfo.ProductName, expectedProductName, StringComparison.OrdinalIgnoreCase);
+                bool companyNameMatch = string.Equals(versionInfo.CompanyName, expectedCompanyName, StringComparison.OrdinalIgnoreCase);
+
+                Console.WriteLine($"[VALIDATION] Expected ProductName: {expectedProductName}, Actual: {versionInfo.ProductName} -> {(productNameMatch ? "PASS" : "FAIL")}");
+                Console.WriteLine($"[VALIDATION] Expected CompanyName: {expectedCompanyName}, Actual: {versionInfo.CompanyName} -> {(companyNameMatch ? "PASS" : "FAIL")}");
+
+                return productNameMatch && companyNameMatch;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[METADATA] 메타데이터 읽기 실패: {ex.Message}");
+                return false;
             }
         }
     }
