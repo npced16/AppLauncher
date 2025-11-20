@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Win32;
 using AppLauncher.Features.TrayApp;
@@ -11,6 +12,8 @@ using AppLauncher.Features.VersionManagement;
 using AppLauncher.Presentation.WinForms;
 using AppLauncher.Shared.Configuration;
 using AppLauncher.Features.AppLaunching;
+using AppLauncher.Features.MqttControl;
+using AppLauncher.Shared.Services;
 
 namespace AppLauncher
 {
@@ -238,51 +241,68 @@ namespace AppLauncher
             DebugLog("[Main] Pending update 확인...");
             if (PendingUpdateManager.HasPendingUpdate())
             {
-                DebugLog("[Main] Pending update 발견! 업데이트 진행...");
-
-                try
-                {
-                    var pendingUpdate = PendingUpdateManager.LoadPendingUpdate();
-                    if (pendingUpdate != null)
-                    {
-                        // 설정 파일 로드
-                        var config = ConfigManager.LoadConfig();
-
-                        // 전체화면 업데이트 프로그레스 폼 표시
-                        using (var updateForm = new UpdateProgressForm(pendingUpdate, config))
-                        {
-                            DebugLog("[Main] UpdateProgressForm 실행...");
-                            Application.Run(updateForm);
-                            DebugLog("[Main] UpdateProgressForm 종료");
-                        }
-
-                        DebugLog("[Main] 업데이트 완료. 컴퓨터 재시작 예정...");
-                        // 업데이트 완료 후 컴퓨터 재시작되므로 여기서 종료
-                        return;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    DebugLog($"[Main] 업데이트 처리 오류: {ex.Message}");
-                    MessageBox.Show(
-                        $"업데이트 처리 중 오류가 발생했습니다:\n{ex.Message}\n\n정상 모드로 계속 진행합니다.",
-                        "업데이트 오류",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Warning
-                    );
-
-                }
+                UpdateLauncher();
             }
             else
             {
-                // 업데이트가 없으면 백그라운드 프로그램 시작
-                DebugLog("[Main] 업데이트 없음. 백그라운드 프로그램 시작...");
+                startAppAndMQTT();
+            }
 
-                try
+
+        }
+
+        private static void UpdateLauncher()
+        {
+            DebugLog("[Main] Pending update 발견! 업데이트 진행...");
+
+            try
+            {
+                var pendingUpdate = PendingUpdateManager.LoadPendingUpdate();
+                if (pendingUpdate != null)
                 {
                     var config = ConfigManager.LoadConfig();
-                    if (!string.IsNullOrEmpty(config.TargetExecutable) && File.Exists(config.TargetExecutable))
+                    using (var updateForm = new UpdateProgressForm(pendingUpdate, config))
                     {
+                        DebugLog("[Main] UpdateProgressForm 실행...");
+                        Application.Run(updateForm);
+                        DebugLog("[Main] UpdateProgressForm 종료");
+                    }
+                    DebugLog("[Main] 업데이트 완료. 컴퓨터 재시작 예정...");
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLog($"[Main] 업데이트 처리 오류: {ex.Message}");
+                MessageBox.Show(
+                    $"업데이트 처리 중 오류가 발생했습니다:\n{ex.Message}\n\n정상 모드로 계속 진행합니다.",
+                    "업데이트 오류",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                );
+                startAppAndMQTT();
+            }
+        }
+
+        private static void startAppAndMQTT()
+        {
+
+            // 업데이트가 없으면 백그라운드 프로그램 시작
+            DebugLog("[Main] 업데이트 없음. 백그라운드 프로그램 시작...");
+            var config = ConfigManager.LoadConfig();
+
+            // 서비스 컨테이너 초기화
+            DebugLog("[Main] ServiceContainer 초기화 중...");
+            ServiceContainer.Initialize(config);
+
+            try
+            {
+                // 파일 존재 여부 체크
+                if (!string.IsNullOrEmpty(config.TargetExecutable))
+                {
+                    if (File.Exists(config.TargetExecutable))
+                    {
+                        // 파일이 있으면 정상 실행
                         var launcher = new ApplicationLauncher();
                         Action<string> statusCallback = status => DebugLog($"[LAUNCH] {status}");
                         _ = launcher.CheckAndLaunchInBackgroundAsync(config, statusCallback);
@@ -291,22 +311,36 @@ namespace AppLauncher
                     }
                     else
                     {
-                        DebugLog("[Main] 대상 프로그램이 설정되지 않음");
+                        // 파일이 없으면 MQTT를 통해 서버에 업데이트 요청
+                        DebugLog("[Main] 대상 파일이 존재하지 않음. 서버에 업데이트 요청...");
+                        _ = RequestLabViewUpdateFromServerAsync(config);
                     }
                 }
-                catch (Exception ex)
+                else
                 {
-                    DebugLog($"[Main] 백그라운드 프로그램 시작 오류: {ex.Message}");
+                    DebugLog("[Main] 대상 프로그램이 설정되지 않음");
                 }
             }
+            catch (Exception ex)
+            {
+                DebugLog($"[Main] 백그라운드 프로그램 시작 오류: {ex.Message}");
+            }
 
-            // 트레이 앱 시작
             DebugLog("[Main] TrayApplicationContext 생성...");
             using (var trayContext = new TrayApplicationContext())
             {
                 DebugLog("[Main] Application.Run 시작");
                 Application.Run(trayContext);
                 DebugLog("[Main] Application.Run 종료");
+            }
+
+            // MQTT 서비스 정리
+            if (ServiceContainer.MqttService != null)
+            {
+                DebugLog("[Main] MQTT 서비스 정리 중...");
+                ServiceContainer.MqttService.DisconnectAsync().Wait();
+                ServiceContainer.MqttService.Dispose();
+                ServiceContainer.MqttService = null;
             }
 
             // 정리
@@ -376,6 +410,131 @@ namespace AppLauncher
             catch (Exception ex)
             {
                 MessageBox.Show($"시작프로그램 등록 해제 실패: {ex.Message}", "경고", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        /// <summary>
+        /// 서버에 LabVIEW 업데이트 요청 (파일 없을 때)
+        /// </summary>
+        private static async Task RequestLabViewUpdateFromServerAsync(LauncherConfig config)
+        {
+            try
+            {
+                if (ServiceContainer.MqttService == null)
+                {
+                    DebugLog("[UPDATE_REQUEST] 전역 MQTT 서비스가 초기화되지 않았습니다");
+                    return;
+                }
+
+                DebugLog("[UPDATE_REQUEST] 전역 MQTT 서비스 사용");
+
+                // 메시지 수신 이벤트 핸들러
+                bool updateReceived = false;
+                LaunchCommand? receivedCommand = null;
+                TaskCompletionSource<bool> updateReceivedTcs = new TaskCompletionSource<bool>();
+
+                void MessageHandler(MqttMessage msg)
+                {
+                    try
+                    {
+                        ServiceContainer.MqttMessageHandler.HandleMessage(msg);
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugLog($"[UPDATE_REQUEST] 메시지 처리 오류: {ex.Message}");
+                    }
+                }
+
+                // 임시 이벤트 핸들러 등록
+                ServiceContainer.MqttService.MessageReceived += MessageHandler;
+
+                try
+                {
+                    // MQTT 연결 (아직 연결되지 않은 경우)
+                    if (!ServiceContainer.MqttService.IsConnected)
+                    {
+                        DebugLog("[UPDATE_REQUEST] MQTT 연결 중...");
+                        await ServiceContainer.MqttService.ConnectAsync();
+
+                        if (!ServiceContainer.MqttService.IsConnected)
+                        {
+                            DebugLog("[UPDATE_REQUEST] MQTT 연결 실패");
+                            return;
+                        }
+
+                        DebugLog("[UPDATE_REQUEST] MQTT 연결 성공");
+                    }
+                    else
+                    {
+                        DebugLog("[UPDATE_REQUEST] 이미 MQTT 연결됨");
+                    }
+
+                    // 서버에 업데이트 요청 전송
+                    string hardwareUuid = HardwareInfo.GetHardwareUuid();
+                    var request = new
+                    {
+                        status = "labview_update_request",
+                        payload = new
+                        {
+                            reason = "file_not_found",
+                            currentVersion = "0.0.0",
+                            hardwareUUID = hardwareUuid,
+                            location = config.MqttSettings.Location,
+                            timestamp = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss")
+                        }
+                    };
+                    // SendStatus("labview_update_request");
+
+                    await ServiceContainer.MqttService.PublishJsonAsync(ServiceContainer.MqttService.StatusTopic, request);
+                    DebugLog("[UPDATE_REQUEST] 업데이트 요청 전송 완료");
+
+                    // 서버 응답 대기 (최대 30초)
+                    DebugLog("[UPDATE_REQUEST] 서버 응답 대기 중... (최대 30초)");
+                    var timeoutTask = Task.Delay(30000);
+                    var completedTask = await Task.WhenAny(updateReceivedTcs.Task, timeoutTask);
+
+                    if (completedTask == timeoutTask)
+                    {
+                        DebugLog("[UPDATE_REQUEST] 서버 응답 타임아웃 (30초)");
+                        return;
+                    }
+
+                    if (updateReceived && receivedCommand != null && !string.IsNullOrEmpty(receivedCommand.URL))
+                    {
+                        DebugLog($"[UPDATE_REQUEST] 다운로드 시작: {receivedCommand.URL}");
+
+                        // 다운로드 및 설치
+                        var updater = new LabViewUpdater(receivedCommand, config);
+                        string downloadedPath = await updater.DownloadAndExecuteAsync();
+
+                        if (!string.IsNullOrEmpty(downloadedPath))
+                        {
+                            DebugLog("[UPDATE_REQUEST] 설치 완료. 앱 실행...");
+
+                            // 설치 완료 후 앱 실행
+                            await Task.Delay(2000);
+                            if (File.Exists(config.TargetExecutable))
+                            {
+                                var launcher = new ApplicationLauncher();
+                                Action<string> statusCallback = status => DebugLog($"[LAUNCH] {status}");
+                                _ = launcher.CheckAndLaunchInBackgroundAsync(config, statusCallback);
+                            }
+                        }
+                        else
+                        {
+                            DebugLog("[UPDATE_REQUEST] 설치 실패");
+                        }
+                    }
+                }
+                finally
+                {
+                    // 임시 이벤트 핸들러 제거
+                    ServiceContainer.MqttService.MessageReceived -= MessageHandler;
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLog($"[UPDATE_REQUEST] 오류 발생: {ex.Message}");
             }
         }
     }

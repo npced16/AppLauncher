@@ -4,13 +4,14 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using AppLauncher.Features.MqttControl;
 using AppLauncher.Shared;
+using AppLauncher.Shared.Services;
 using AppLauncher.Shared.Configuration;
 
 namespace AppLauncher.Presentation.WinForms
 {
     public class MqttControlForm : Form
     {
-        private MqttService? _mqttService;
+        private MqttService _mqttService => ServiceContainer.MqttService!;
         private MqttSettings? _settings;
 
         private Label connectionStatusLabel;
@@ -25,9 +26,8 @@ namespace AppLauncher.Presentation.WinForms
         private Button clearLogButton;
         private Button closeButton;
 
-        public MqttControlForm(MqttService? mqttService = null)
+        public MqttControlForm()
         {
-            _mqttService = mqttService;
             InitializeComponent();
             LoadSettings();
         }
@@ -169,29 +169,13 @@ namespace AppLauncher.Presentation.WinForms
                 var config = ConfigManager.LoadConfig();
                 _settings = config.MqttSettings;
 
-                if (_settings != null)
-                {
-                    brokerInfoLabel.Text = $"브로커: {_settings.Broker}:{_settings.Port}";
-                    string clientId = _mqttService?.ClientId ?? HardwareInfo.GetHardwareUuid();
-                    clientIdLabel.Text = $"클라이언트 ID: {clientId}";
-                    topicLabel.Text = $"구독 토픽: device/{clientId}/commands";
+                brokerInfoLabel.Text = $"브로커: {_settings.Broker}:{_settings.Port}";
+                string clientId = _mqttService.ClientId;
+                clientIdLabel.Text = $"클라이언트 ID: {clientId}";
+                topicLabel.Text = $"구독 토픽: device/{clientId}/commands";
 
-                    if (_mqttService != null)
-                    {
-                        // 기존 서비스 사용
-                        AttachToExistingService();
-                    }
-                    else
-                    {
-                        // 새 서비스 생성
-                        InitializeMqttService();
-                    }
-                }
-                else
-                {
-                    AddLog("MQTT 설정을 찾을 수 없습니다.");
-                    connectButton.Enabled = false;
-                }
+                // 전역 MQTT 서비스에 연결
+                AttachToExistingService();
             }
             catch (Exception ex)
             {
@@ -201,33 +185,15 @@ namespace AppLauncher.Presentation.WinForms
 
         private void AttachToExistingService()
         {
-            if (_mqttService == null) return;
-
             // 이벤트 구독
             _mqttService.ConnectionStateChanged += OnConnectionStateChanged;
             _mqttService.LogMessage += OnLogMessage;
             _mqttService.MessageReceived += OnMessageReceived;
 
-            AddLog("기존 MQTT 서비스에 연결됨");
+            AddLog("전역 MQTT 서비스에 연결됨");
 
             // 현재 연결 상태 업데이트
             OnConnectionStateChanged(_mqttService.IsConnected);
-        }
-
-        private void InitializeMqttService()
-        {
-            if (_settings == null) return;
-
-            // 하드웨어 UUID를 ClientId로 사용
-            string clientId = HardwareInfo.GetHardwareUuid();
-            _mqttService = new MqttService(_settings, clientId);
-
-            // 이벤트 구독
-            _mqttService.ConnectionStateChanged += OnConnectionStateChanged;
-            _mqttService.LogMessage += OnLogMessage;
-            _mqttService.MessageReceived += OnMessageReceived;
-
-            AddLog("새 MQTT 서비스 초기화 완료");
         }
 
         private void OnConnectionStateChanged(bool isConnected)
@@ -305,12 +271,6 @@ namespace AppLauncher.Presentation.WinForms
 
         private async void ConnectButton_Click(object? sender, EventArgs e)
         {
-            if (_mqttService == null)
-            {
-                AddLog("❌ MQTT 서비스가 초기화되지 않았습니다.");
-                return;
-            }
-
             try
             {
                 connectButton.Enabled = false;
@@ -329,8 +289,6 @@ namespace AppLauncher.Presentation.WinForms
 
         private async void DisconnectButton_Click(object? sender, EventArgs e)
         {
-            if (_mqttService == null) return;
-
             try
             {
                 disconnectButton.Enabled = false;
@@ -352,12 +310,6 @@ namespace AppLauncher.Presentation.WinForms
 
         private async void ReconnectButton_Click(object? sender, EventArgs e)
         {
-            if (_mqttService == null)
-            {
-                AddLog("❌ MQTT 서비스가 초기화되지 않았습니다.");
-                return;
-            }
-
             try
             {
                 reconnectButton.Enabled = false;
@@ -414,12 +366,9 @@ namespace AppLauncher.Presentation.WinForms
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             // 창이 닫힐 때 이벤트만 정리 (서비스는 유지)
-            if (_mqttService != null)
-            {
-                _mqttService.ConnectionStateChanged -= OnConnectionStateChanged;
-                _mqttService.LogMessage -= OnLogMessage;
-                _mqttService.MessageReceived -= OnMessageReceived;
-            }
+            _mqttService.ConnectionStateChanged -= OnConnectionStateChanged;
+            _mqttService.LogMessage -= OnLogMessage;
+            _mqttService.MessageReceived -= OnMessageReceived;
 
             base.OnFormClosing(e);
         }

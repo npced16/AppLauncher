@@ -10,6 +10,7 @@ using AppLauncher.Features.MqttControl;
 using AppLauncher.Presentation.WinForms;
 using AppLauncher.Shared;
 using AppLauncher.Shared.Configuration;
+using AppLauncher.Shared.Services;
 
 namespace AppLauncher.Features.TrayApp
 {
@@ -19,8 +20,7 @@ namespace AppLauncher.Features.TrayApp
         private MainForm? _mainForm;
         private MqttControlForm? _mqttControlForm;
         private LauncherSettingsForm? _launcherSettingsForm;
-        private MqttService? _mqttService;
-        private MqttMessageHandler? _mqttMessageHandler;
+        private MqttMessageHandler _mqttMessageHandler => ServiceContainer.MqttMessageHandler!;
         private LauncherConfig? _config;
         private System.Timers.Timer? _statusTimer;
         private System.Timers.Timer? _reconnectTimer;
@@ -36,6 +36,7 @@ namespace AppLauncher.Features.TrayApp
         {
             DebugLog("[TrayApplicationContext] InitializeTrayIcon 호출");
             InitializeTrayIcon();
+
             DebugLog("[TrayApplicationContext] StartServices 호출");
             StartServices();
             DebugLog("[TrayApplicationContext] 생성자 완료");
@@ -118,69 +119,26 @@ namespace AppLauncher.Features.TrayApp
             _notifyIcon.ContextMenuStrip = contextMenu;
         }
 
-        private async void StartServices()
+        private void StartServices()
         {
             try
             {
-
                 // 설정 로드
                 _config = ConfigManager.LoadConfig();
 
-                // MQTT 서비스 시작
-                if (_config.MqttSettings != null)
+                if (ServiceContainer.MqttService.IsConnected)
                 {
-                    await StartMqttServiceAsync();
+                    _mqttMessageHandler?.SendStatus("connected");
+                    StartStatusTimer();
                 }
-
             }
             catch (Exception ex)
             {
-                _notifyIcon.ShowBalloonTip(3000, "오류", ex.Message, ToolTipIcon.Error);
+                _notifyIcon?.ShowBalloonTip(3000, "오류", ex.Message, ToolTipIcon.Error);
             }
         }
 
-        private async Task StartMqttServiceAsync()
-        {
-            try
-            {
-                if (_config?.MqttSettings == null)
-                {
-                    return;
-                }
 
-                // 하드웨어 UUID를 ClientId로 사용
-                string clientId = HardwareInfo.GetHardwareUuid();
-                _mqttService = new MqttService(_config.MqttSettings, clientId);
-
-                // MQTT 메시지 핸들러 생성
-                _mqttMessageHandler = new MqttMessageHandler(
-                    _mqttService,
-                    _config,
-                    ShowBalloonTip
-                );
-
-                // 이벤트 핸들러 등록
-                _mqttService.MessageReceived += (msg) => _mqttMessageHandler?.HandleMessage(msg);
-                _mqttService.ConnectionStateChanged += OnMqttConnectionStateChanged;
-                _mqttService.LogMessage += OnMqttLogMessage;
-
-                // MQTT 브로커 연결
-                await _mqttService.ConnectAsync();
-            }
-            catch (Exception ex)
-            {
-                string errorDetail = ex.Message;
-                if (ex.InnerException != null)
-                {
-                    errorDetail += $"\n상세: {ex.InnerException.Message}";
-                }
-
-                Console.WriteLine($"[MQTT] Initial connection failed: {errorDetail}");
-
-                // 최초 연결 실패 시 재연결 타이머 시작
-                StartReconnectTimer();
-            }
-        }
 
         private void OnMqttConnectionStateChanged(bool isConnected)
         {
@@ -277,9 +235,9 @@ namespace AppLauncher.Features.TrayApp
             {
                 Console.WriteLine("[MQTT] Attempting to reconnect...");
 
-                if (_mqttService != null && !_mqttService.IsConnected)
+                if (ServiceContainer.MqttService != null && !ServiceContainer.MqttService.IsConnected)
                 {
-                    await _mqttService.ConnectAsync();
+                    await ServiceContainer.MqttService.ConnectAsync();
                 }
             }
             catch (Exception ex)
@@ -341,8 +299,8 @@ namespace AppLauncher.Features.TrayApp
         {
             if (_mqttControlForm == null || _mqttControlForm.IsDisposed)
             {
-                // 기존 MqttService 인스턴스를 전달
-                _mqttControlForm = new MqttControlForm(_mqttService);
+                // 전역 MqttService 사용
+                _mqttControlForm = new MqttControlForm();
                 _mqttControlForm.FormClosed += (s, args) =>
                 {
                     _mqttControlForm = null;
@@ -376,9 +334,9 @@ namespace AppLauncher.Features.TrayApp
                 }
 
                 // MQTT 연결 해제
-                if (_mqttService != null && _mqttService.IsConnected)
+                if (ServiceContainer.MqttService.IsConnected)
                 {
-                    await _mqttService.DisconnectAsync();
+                    await ServiceContainer.MqttService.DisconnectAsync();
                     await Task.Delay(500); // MQTT 연결 해제 대기
                 }
 
@@ -407,14 +365,6 @@ namespace AppLauncher.Features.TrayApp
 
             // 재연결 타이머 정리
             StopReconnectTimer();
-
-            // MQTT 서비스 정리
-            if (_mqttService != null)
-            {
-                _mqttService.DisconnectAsync().Wait();
-                _mqttService.Dispose();
-                _mqttService = null;
-            }
 
             // 트레이 아이콘 정리
             if (_notifyIcon != null)

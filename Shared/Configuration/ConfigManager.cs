@@ -125,7 +125,7 @@ namespace AppLauncher.Shared.Configuration
         /// MQTT 연결 설정
         /// </summary>
         [JsonProperty("mqttSettings")]
-        public MqttSettings? MqttSettings { get; set; }
+        public MqttSettings MqttSettings { get; set; } = new MqttSettings();
     }
 
     public class MqttSettings

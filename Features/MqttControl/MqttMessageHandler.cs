@@ -19,16 +19,25 @@ namespace AppLauncher.Features.MqttControl
     {
         private readonly MqttService _mqttService;
         private readonly LauncherConfig _config;
-        private readonly Action<string, string, int>? _showBalloonTipCallback;
+        private Action<string, string, int>? _showBalloonTipCallback;
 
         public MqttMessageHandler(
             MqttService mqttService,
             LauncherConfig config,
-            Action<string, string, int>? showBalloonTipCallback = null)
+            Action<string, string, int>? showBalloonTipCallback = null
+            )
         {
             _mqttService = mqttService ?? throw new ArgumentNullException(nameof(mqttService));
             _config = config ?? throw new ArgumentNullException(nameof(config));
             _showBalloonTipCallback = showBalloonTipCallback;
+        }
+
+        /// <summary>
+        /// Balloon Tip 콜백 설정 (나중에 설정 가능)
+        /// </summary>
+        public void SetBalloonTipCallback(Action<string, string, int> callback)
+        {
+            _showBalloonTipCallback = callback;
         }
 
         /// <summary>
@@ -49,6 +58,12 @@ namespace AppLauncher.Features.MqttControl
                 // 명령 처리
                 switch (command.Command.ToUpper())
                 {
+
+                    case "LABVIEW_DOWNLOAD":
+                    case "LABVIEWDOWNLOAD":
+                        UpdateLabView(command);
+                        break;
+
                     case "LABVIEW_UPDATE":
                     case "LABVIEWUPDATE":
                         UpdateLabView(command);
@@ -202,7 +217,7 @@ namespace AppLauncher.Features.MqttControl
         {
             try
             {
-                if (_mqttService == null || !_mqttService.IsConnected || _config.MqttSettings == null)
+                if (_mqttService == null || !_mqttService.IsConnected)
                 {
                     return;
                 }
@@ -259,12 +274,6 @@ namespace AppLauncher.Features.MqttControl
                 // 현재 설정 로드
                 var config = ConfigManager.LoadConfig();
 
-                if (config.MqttSettings == null)
-                {
-                    SendStatusResponse("error", "MQTT settings not found");
-                    return;
-                }
-
                 // Location 변경
                 string oldLocation = config.MqttSettings.Location ?? "미설정";
                 config.MqttSettings.Location = command.Location;
@@ -304,16 +313,7 @@ namespace AppLauncher.Features.MqttControl
                         5000
                     );
 
-                    // 새 버전 실행 ( 다음 컴퓨터 재실행시 자동으로 새버전 이 실행되도록 )
-                    // var startInfo = new ProcessStartInfo
-                    // {
-                    //     FileName = updatedPath,
-                    //     UseShellExecute = true
-                    // };
-                    // Process.Start(startInfo);
 
-                    // 현재 앱 종료 안함 - 컴퓨터 재시작시 자동으로 새 버전 실행됨
-                    // System.Windows.Forms.Application.Exit();
                 }
             }
             catch (Exception)
@@ -379,7 +379,42 @@ namespace AppLauncher.Features.MqttControl
                 return null;
             }
         }
+        /// <summary>
+        /// LabVIEW 앱이 없거나 오류 발생 시 서버에 업데이트 요청
+        /// </summary>
+        public async void RequestLabViewUpdate(string reason)
+        {
+            try
+            {
+                if (_mqttService == null || !_mqttService.IsConnected)
+                {
+                    Console.WriteLine("[MQTT] Cannot request update - MQTT not connected");
+                    return;
+                }
 
+                // 현재 버전 정보 수집
+                string currentVersion = GetTargetAppVersion();
+                string hardwareUuid = HardwareInfo.GetHardwareUuid();
+
+                var request = new
+                {
+                    requestType = "labview_update_request",
+                    reason = reason,
+                    currentVersion = currentVersion,
+                    hardwareUUID = hardwareUuid,
+                    location = _config.MqttSettings?.Location,
+                    timestamp = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss")
+                };
+
+                await _mqttService.PublishJsonAsync(_mqttService.StatusTopic, request);
+
+                Console.WriteLine($"[MQTT] Update request sent - Reason: {reason}, Version: {currentVersion}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MQTT] Failed to request update: {ex.Message}");
+            }
+        }
 
     }
 }

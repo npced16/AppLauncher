@@ -172,7 +172,7 @@ flowchart TD
   "targetExecutable": "C:\\Program Files (x86)\\HBOT Operator\\HBOT Operator.exe",
   "localVersionFile": "version.txt",
   "mqttSettings": {
-    "broker": "server3.ibexserver.com",
+    "broker": "localhost",
     "port": 1883,
     "location": ""
   }

@@ -72,7 +72,7 @@ namespace AppLauncher.Presentation.WinForms
             // 타이틀 레이블
             titleLabel = new Label
             {
-                Text = "LabView 업데이트 중",
+                Text = "챔버 소프트웨어 업데이트 중",
                 Font = new Font("Segoe UI", 32, FontStyle.Bold),
                 ForeColor = Color.White,
                 AutoSize = false,
@@ -199,10 +199,10 @@ namespace AppLauncher.Presentation.WinForms
                 else
                 {
                     _updateSuccess = false;
-                    UpdateStatus("업데이트 실패");
+                    UpdateStatus("업데이트 실패 - 기존 프로그램 실행");
                     statusLabel.ForeColor = Color.OrangeRed;
 
-                    await Task.Delay(3000);
+                    await Task.Delay(2000);
                 }
             }
             catch (Exception ex)
@@ -212,7 +212,7 @@ namespace AppLauncher.Presentation.WinForms
                 statusLabel.ForeColor = Color.Red;
                 Console.WriteLine($"[UPDATE_ERROR] {ex.Message}");
 
-                await Task.Delay(3000);
+                await Task.Delay(2000);
             }
             finally
             {
@@ -221,15 +221,71 @@ namespace AppLauncher.Presentation.WinForms
                 // pending update 정리
                 PendingUpdateManager.ClearPendingUpdate();
 
-                // 업데이트 완료 후 컴퓨터 재시작
-                if (InvokeRequired)
+                if (_updateSuccess)
                 {
-                    Invoke(new Action(() => RestartComputer()));
+                    // 업데이트 성공 시 컴퓨터 재시작
+                    if (InvokeRequired)
+                    {
+                        Invoke(new Action(() => RestartComputer()));
+                    }
+                    else
+                    {
+                        RestartComputer();
+                    }
                 }
                 else
                 {
-                    RestartComputer();
+                    // 업데이트 실패 시 기존 프로그램 실행
+                    if (InvokeRequired)
+                    {
+                        Invoke(new Action(() => StartExistingApp()));
+                    }
+                    else
+                    {
+                        StartExistingApp();
+                    }
                 }
+            }
+        }
+
+        /// <summary>
+        /// 업데이트 실패 시 런처 재시작 (LabVIEW 앱 + TrayApp 정상 실행)
+        /// </summary>
+        private void StartExistingApp()
+        {
+            try
+            {
+                UpdateStatus("런처를 재시작합니다...");
+                statusLabel.ForeColor = Color.LightBlue;
+
+                Console.WriteLine("[UPDATE] Restarting launcher after update failure");
+
+                // 2초 후 런처 재시작
+                Task.Delay(2000).ContinueWith(_ =>
+                {
+                    if (InvokeRequired)
+                    {
+                        Invoke(new Action(() =>
+                        {
+                            this.Close();
+                            Application.Restart();
+                            Environment.Exit(0);
+                        }));
+                    }
+                    else
+                    {
+                        this.Close();
+                        Application.Restart();
+                        Environment.Exit(0);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[UPDATE] Failed to restart launcher: {ex.Message}");
+
+                // 실패 시 그냥 폼만 닫기
+                this.Close();
             }
         }
 

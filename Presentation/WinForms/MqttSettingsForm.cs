@@ -140,18 +140,15 @@ namespace AppLauncher.Presentation.WinForms
             {
                 _config = ConfigManager.LoadConfig();
 
-                if (_config.MqttSettings != null)
-                {
-                    // 브로커와 포트 표시
-                    brokerLabel.Text = _config.MqttSettings.Broker;
-                    portLabel.Text = _config.MqttSettings.Port.ToString();
+                // 브로커와 포트 표시
+                brokerLabel.Text = _config.MqttSettings.Broker;
+                portLabel.Text = _config.MqttSettings.Port.ToString();
 
-                    // 클라이언트 ID (하드웨어 UUID) 표시
-                    clientIdLabel.Text = HardwareInfo.GetHardwareUuid();
+                // 클라이언트 ID (하드웨어 UUID) 표시
+                clientIdLabel.Text = HardwareInfo.GetHardwareUuid();
 
-                    // Location 표시 (읽기 전용)
-                    locationLabel.Text = _config.MqttSettings.Location ?? "미설정";
-                }
+                // Location 표시 (읽기 전용)
+                locationLabel.Text = _config.MqttSettings.Location ?? "미설정";
             }
             catch (Exception ex)
             {

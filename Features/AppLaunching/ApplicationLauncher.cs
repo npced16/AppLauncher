@@ -38,7 +38,7 @@ namespace AppLauncher.Features.AppLaunching
         }
 
         /// <summary>
-        /// 백그라운드에서 대상 프로그램 실행 (자동 버전 체크 제거)
+        /// 백그라운드에서 대상 프로그램 실행 
         /// </summary>
         public async Task CheckAndLaunchInBackgroundAsync(LauncherConfig config, Action<string> statusCallback)
         {
