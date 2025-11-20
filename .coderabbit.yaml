@@ -1,0 +1,74 @@
+# CodeRabbit Configuration for AppLauncher
+# https://docs.coderabbit.ai/guides/configure-coderabbit
+
+# Language settings
+language: ko
+
+# Review settings
+reviews:
+  # Request changes on critical issues
+  request_changes_workflow: true
+
+  # Provide high-level summary
+  high_level_summary: true
+
+  # Review each file in detail
+  poem: false
+
+  # Provide review summary
+  review_status: true
+
+  # Auto-approve PRs
+  auto_review:
+    enabled: true
+    # Don't auto-approve, let human review
+    auto_approve: false
+
+  # Labels to apply
+  labels:
+    - "coderabbit"
+
+# Path-based instructions
+path_instructions:
+  - path: "**/*.cs"
+    instructions: |
+      - C# 코딩 컨벤션 준수 확인
+      - null 참조 예외 가능성 확인
+      - 리소스 정리 (IDisposable) 확인
+      - async/await 패턴 올바른 사용 확인
+
+  - path: "**/Features/**/*.cs"
+    instructions: |
+      - 기능별 책임 분리 확인
+      - 의존성 주입 패턴 확인
+
+  - path: "**/Presentation/**/*.cs"
+    instructions: |
+      - UI 스레드 안전성 확인
+      - 폼 리소스 정리 확인
+
+  - path: "**/MqttControl/**/*.cs"
+    instructions: |
+      - MQTT 연결 관리 확인
+      - 에러 핸들링 확인
+      - 타이머 리소스 정리 확인
+
+# Files to ignore
+ignore:
+  - "**/*.Designer.cs"
+  - "**/obj/**"
+  - "**/bin/**"
+  - "**/*.resx"
+  - "**/packages/**"
+  - "**/.vs/**"
+
+# Knowledge base
+knowledge_base:
+  - "이 프로젝트는 Windows Forms 기반 C# 애플리케이션입니다."
+  - "MQTT를 통한 원격 제어 기능을 제공합니다."
+  - "LabVIEW 애플리케이션 자동 업데이트 및 실행 관리 기능이 있습니다."
+  - ".NET 9.0 타겟 프레임워크를 사용합니다."
+
+# Chat settings
+chat:
+  auto_reply: false

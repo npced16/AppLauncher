@@ -130,7 +130,7 @@ namespace AppLauncher.Features.MqttControl
                 string hardwareUuid = HardwareInfo.GetHardwareUuid();
 
                 // LabVIEW 프로세스 상태 가져오기 (프로세스 이름으로 검색)
-                object labviewStatus;
+                object _labviewStatus;
                 Process? hbotProcess = FindHBOTOperatorProcess();
 
                 if (hbotProcess != null && !hbotProcess.HasExited)
@@ -138,30 +138,30 @@ namespace AppLauncher.Features.MqttControl
                     hbotProcess.Refresh(); // 최신 정보로 갱신
 
                     var runningTime = DateTime.Now - hbotProcess.StartTime;
-                    long memoryMB = hbotProcess.WorkingSet64 / 1024 / 1024;
+                    long _memoryMB = hbotProcess.WorkingSet64 / 1024 / 1024;
 
-                    labviewStatus = new
+                    _labviewStatus = new
                     {
                         status = "running",
                         processName = hbotProcess.ProcessName,
                         pid = hbotProcess.Id,
                         runningTime = $"{runningTime.Hours:D2}:{runningTime.Minutes:D2}:{runningTime.Seconds:D2}",
-                        memoryMB = memoryMB,
+                        memoryMB = _memoryMB,
                         responding = hbotProcess.Responding,
                         threadCount = hbotProcess.Threads.Count,
                     };
                 }
                 else
                 {
-                    labviewStatus = new
+                    _labviewStatus = new
                     {
-                        status = "stopped"
-                        processName = null,
-                        pid = null,
-                        runningTime = null,
-                        memoryMB = null,
-                        responding = null,
-                        threadCount = null,
+                        status = "stopped",
+                        processName = (string?)null,
+                        pid = (int?)null,
+                        runningTime = (string?)null,
+                        memoryMB = (long?)null,
+                        responding = (bool?)null,
+                        threadCount = (int?)null
                     };
                 }
 
@@ -170,7 +170,7 @@ namespace AppLauncher.Features.MqttControl
                     status = statusMessage,
                     payload = new
                     {
-                        labviewStatus = labviewStatus,
+                        labviewStatus = _labviewStatus,
                         location = _config.MqttSettings?.Location,
                         hardwareUUID = hardwareUuid,
                         launcher = new
