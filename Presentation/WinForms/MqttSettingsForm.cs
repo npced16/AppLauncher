@@ -13,9 +13,8 @@ namespace AppLauncher.Presentation.WinForms
         private Label brokerLabel;
         private Label portLabel;
         private Label clientIdLabel;
-        private TextBox locationTextBox;
-        private Button saveButton;
-        private Button cancelButton;
+        private Label locationLabel;
+        private Button closeButton;
 
         public MqttSettingsForm()
         {
@@ -25,8 +24,8 @@ namespace AppLauncher.Presentation.WinForms
 
         private void InitializeComponent()
         {
-            this.Text = "MQTT 설정";
-            this.Size = new Size(500, 350);
+            this.Text = "MQTT 정보";
+            this.Size = new Size(500, 300);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -93,27 +92,30 @@ namespace AppLauncher.Presentation.WinForms
             };
             this.Controls.Add(clientIdLabel);
 
-            // Location Label (Editable)
+            // Location Label (Header)
             var locationHeaderLabel = new Label
             {
-                Text = "위치 (선택사항):",
+                Text = "위치:",
                 Location = new Point(20, 120),
                 Size = new Size(120, 20)
             };
             this.Controls.Add(locationHeaderLabel);
 
-            // Location TextBox
-            locationTextBox = new TextBox
+            // Location Text (Read-only)
+            locationLabel = new Label
             {
-                Location = new Point(150, 118),
-                Size = new Size(300, 25)
+                Text = "",
+                Location = new Point(150, 120),
+                Size = new Size(300, 20),
+                BorderStyle = BorderStyle.FixedSingle,
+                BackColor = Color.LightGray
             };
-            this.Controls.Add(locationTextBox);
+            this.Controls.Add(locationLabel);
 
             // Info Label
             var infoLabel = new Label
             {
-                Text = "* 브로커, 포트, 클라이언트 ID는 자동으로 설정됩니다.",
+                Text = "* 위치는 일반 설정 창에서 수정할 수 있습니다.",
                 Location = new Point(20, 160),
                 Size = new Size(450, 40),
                 ForeColor = Color.Gray,
@@ -121,25 +123,15 @@ namespace AppLauncher.Presentation.WinForms
             };
             this.Controls.Add(infoLabel);
 
-            // Save Button
-            saveButton = new Button
+            // Close Button
+            closeButton = new Button
             {
-                Text = "저장",
-                Location = new Point(280, 250),
+                Text = "닫기",
+                Location = new Point(370, 210),
                 Size = new Size(80, 35)
             };
-            saveButton.Click += SaveButton_Click;
-            this.Controls.Add(saveButton);
-
-            // Cancel Button
-            cancelButton = new Button
-            {
-                Text = "취소",
-                Location = new Point(370, 250),
-                Size = new Size(80, 35)
-            };
-            cancelButton.Click += (s, e) => this.Close();
-            this.Controls.Add(cancelButton);
+            closeButton.Click += (s, e) => this.Close();
+            this.Controls.Add(closeButton);
         }
 
         private void LoadCurrentSettings()
@@ -150,51 +142,20 @@ namespace AppLauncher.Presentation.WinForms
 
                 if (_config.MqttSettings != null)
                 {
-                    // 브로커와 포트는 표시만 (편집 불가)
+                    // 브로커와 포트 표시
                     brokerLabel.Text = _config.MqttSettings.Broker;
                     portLabel.Text = _config.MqttSettings.Port.ToString();
 
                     // 클라이언트 ID (하드웨어 UUID) 표시
                     clientIdLabel.Text = HardwareInfo.GetHardwareUuid();
 
-                    // 편집 가능한 필드들
-                    locationTextBox.Text = _config.MqttSettings.Location ?? "";
+                    // Location 표시 (읽기 전용)
+                    locationLabel.Text = _config.MqttSettings.Location ?? "미설정";
                 }
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"설정 로드 실패: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void SaveButton_Click(object? sender, EventArgs e)
-        {
-            try
-            {
-                // MQTT 설정 업데이트
-                if (_config.MqttSettings == null)
-                {
-                    _config.MqttSettings = new MqttSettings();
-                }
-
-                // Location 설정
-                _config.MqttSettings.Location = string.IsNullOrWhiteSpace(locationTextBox.Text) ? null : locationTextBox.Text.Trim();
-
-                // 설정 저장
-                ConfigManager.SaveConfig(_config);
-
-                MessageBox.Show(
-                    "설정이 저장되었습니다.\n\nMQTT 연결을 다시 시작하려면 MQTT 제어창에서 연결을 해제한 후 다시 연결해주세요.",
-                    "저장 완료",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information
-                );
-
-                this.Close();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"설정 저장 실패: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }

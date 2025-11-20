@@ -270,6 +270,7 @@ namespace AppLauncher
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Warning
                     );
+
                 }
             }
             else

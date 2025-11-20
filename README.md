@@ -136,16 +136,16 @@ flowchart TD
 ### 챔버 소프트웨어 업데이트
 ```json
 {
-  "Command": "LABVIEW_UPDATE",
+  "command": "LABVIEW_UPDATE",
   "URL": "https://example.com/update.zip",
-  "Version": "1.0.0.285"
+  "version": "1.0.0.285"
 }
 ```
 
 ### 런처 업데이트
 ```json
 {
-  "Command": "LAUNCHER_UPDATE",
+  "command": "LAUNCHER_UPDATE",
   "URL": "https://example.com/AppLauncher.exe"
 }
 ```
@@ -153,15 +153,15 @@ flowchart TD
 ### 위치 변경
 ```json
 {
-  "Command": "LOCATION_CHANGE",
-  "Location": "Seoul"
+  "command": "LOCATION_CHANGE",
+  "location": "Seoul"
 }
 ```
 
 ### 상태 확인
 ```json
 {
-  "Command": "STATUS"
+  "command": "STATUS"
 }
 ```
 
@@ -169,17 +169,12 @@ flowchart TD
 
 ```json
 {
-  "TargetExecutable": "C:\\Program Files\\HBOT\\HBOT Operator.exe",
-  "LocalVersionFile": "C:\\ProgramData\\AppLauncher\\Data\\labview_version.txt",
-  "MqttSettings": {
-    "BrokerAddress": "mqtt.example.com",
-    "BrokerPort": 1883,
-    "ClientId": "AppLauncher_PC001",
-    "Username": "username",
-    "Password": "password",
-    "Topic": "hbot/chamber/commands",
-    "ResponseTopic": "hbot/chamber/responses",
-    "Location": "Seoul"
+  "targetExecutable": "C:\\Program Files (x86)\\HBOT Operator\\HBOT Operator.exe",
+  "localVersionFile": "version.txt",
+  "mqttSettings": {
+    "broker": "server3.ibexserver.com",
+    "port": 1883,
+    "location": ""
   }
 }
 ```

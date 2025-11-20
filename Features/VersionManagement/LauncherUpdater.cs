@@ -140,18 +140,6 @@ namespace AppLauncher.Features.VersionManagement
                 // 다운로드한 exe의 메타데이터
                 var downloadedVersion = FileVersionInfo.GetVersionInfo(downloadedExePath);
 
-                Console.WriteLine($"[VALIDATE] 현재 프로그램:");
-                Console.WriteLine($"  - ProductName: {currentVersion.ProductName}");
-                Console.WriteLine($"  - CompanyName: {currentVersion.CompanyName}");
-                Console.WriteLine($"  - InternalName: {currentVersion.InternalName}");
-                Console.WriteLine($"  - OriginalFilename: {currentVersion.OriginalFilename}");
-
-                Console.WriteLine($"[VALIDATE] 다운로드한 파일:");
-                Console.WriteLine($"  - ProductName: {downloadedVersion.ProductName}");
-                Console.WriteLine($"  - CompanyName: {downloadedVersion.CompanyName}");
-                Console.WriteLine($"  - InternalName: {downloadedVersion.InternalName}");
-                Console.WriteLine($"  - OriginalFilename: {downloadedVersion.OriginalFilename}");
-
                 // ProductName 비교 (가장 중요)
                 if (currentVersion.ProductName != downloadedVersion.ProductName)
                 {
@@ -165,15 +153,6 @@ namespace AppLauncher.Features.VersionManagement
                     currentVersion.InternalName != downloadedVersion.InternalName)
                 {
                     Console.WriteLine($"[VALIDATE] InternalName 불일치: '{currentVersion.InternalName}' != '{downloadedVersion.InternalName}'");
-                    return false;
-                }
-
-                // OriginalFilename 비교
-                if (!string.IsNullOrEmpty(currentVersion.OriginalFilename) &&
-                    !string.IsNullOrEmpty(downloadedVersion.OriginalFilename) &&
-                    currentVersion.OriginalFilename != downloadedVersion.OriginalFilename)
-                {
-                    Console.WriteLine($"[VALIDATE] OriginalFilename 불일치: '{currentVersion.OriginalFilename}' != '{downloadedVersion.OriginalFilename}'");
                     return false;
                 }
 

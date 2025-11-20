@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Threading.Tasks;
+using System.Timers;
 using System.Windows.Forms;
 using AppLauncher.Features.AppLaunching;
 using AppLauncher.Features.MqttControl;
@@ -21,7 +22,8 @@ namespace AppLauncher.Features.TrayApp
         private MqttService? _mqttService;
         private MqttMessageHandler? _mqttMessageHandler;
         private LauncherConfig? _config;
-        private ApplicationLauncher? _applicationLauncher;
+        private System.Timers.Timer? _statusTimer;
+        private System.Timers.Timer? _reconnectTimer;
 
         private static void DebugLog(string message)
         {
@@ -154,7 +156,6 @@ namespace AppLauncher.Features.TrayApp
                 _mqttMessageHandler = new MqttMessageHandler(
                     _mqttService,
                     _config,
-                    _applicationLauncher,
                     ShowBalloonTip
                 );
 
@@ -173,6 +174,11 @@ namespace AppLauncher.Features.TrayApp
                 {
                     errorDetail += $"\n상세: {ex.InnerException.Message}";
                 }
+
+                Console.WriteLine($"[MQTT] Initial connection failed: {errorDetail}");
+
+                // 최초 연결 실패 시 재연결 타이머 시작
+                StartReconnectTimer();
             }
         }
 
@@ -180,8 +186,105 @@ namespace AppLauncher.Features.TrayApp
         {
             if (isConnected)
             {
+                // 연결 성공 시 재연결 타이머 중지
+                StopReconnectTimer();
+
                 // 연결 성공 시 초기 상태 전송
                 _mqttMessageHandler?.SendStatus("connected");
+
+                // 1분마다 상태 전송 타이머 시작
+                StartStatusTimer();
+            }
+            else
+            {
+                // 연결 끊어지면 상태 타이머 중지
+                StopStatusTimer();
+
+                // 1분마다 재연결 시도 타이머 시작
+                StartReconnectTimer();
+            }
+        }
+
+        private void StartStatusTimer()
+        {
+            // 기존 타이머가 있으면 중지
+            StopStatusTimer();
+
+            // 1분(60초) 간격으로 타이머 생성
+            _statusTimer = new System.Timers.Timer(60000);
+            _statusTimer.Elapsed += OnStatusTimerElapsed;
+            _statusTimer.AutoReset = true;
+            _statusTimer.Start();
+            Console.WriteLine("[MQTT] Status timer started (interval: 60 seconds)");
+        }
+
+        private void StopStatusTimer()
+        {
+            if (_statusTimer != null)
+            {
+                _statusTimer.Stop();
+                _statusTimer.Elapsed -= OnStatusTimerElapsed;
+                _statusTimer.Dispose();
+                _statusTimer = null;
+
+                Console.WriteLine("[MQTT] Status timer stopped");
+            }
+        }
+
+        private void OnStatusTimerElapsed(object? sender, ElapsedEventArgs e)
+        {
+            try
+            {
+                // 1분마다 자동으로 상태 전송
+                _mqttMessageHandler?.SendStatus("current_status");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MQTT] Status timer error: {ex.Message}");
+            }
+        }
+
+        private void StartReconnectTimer()
+        {
+            // 기존 타이머가 있으면 중지
+            StopReconnectTimer();
+
+            // 1분(60초) 간격으로 재연결 시도 타이머 생성
+            _reconnectTimer = new System.Timers.Timer(60000);
+            _reconnectTimer.Elapsed += OnReconnectTimerElapsed;
+            _reconnectTimer.AutoReset = true;
+            _reconnectTimer.Start();
+
+            Console.WriteLine("[MQTT] Reconnect timer started (interval: 60 seconds)");
+        }
+
+        private void StopReconnectTimer()
+        {
+            if (_reconnectTimer != null)
+            {
+                _reconnectTimer.Stop();
+                _reconnectTimer.Elapsed -= OnReconnectTimerElapsed;
+                _reconnectTimer.Dispose();
+                _reconnectTimer = null;
+
+                Console.WriteLine("[MQTT] Reconnect timer stopped");
+            }
+        }
+
+        private async void OnReconnectTimerElapsed(object? sender, ElapsedEventArgs e)
+        {
+            try
+            {
+                Console.WriteLine("[MQTT] Attempting to reconnect...");
+
+                if (_mqttService != null && !_mqttService.IsConnected)
+                {
+                    await _mqttService.ConnectAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MQTT] Reconnect failed: {ex.Message}");
             }
         }
 
@@ -299,11 +402,11 @@ namespace AppLauncher.Features.TrayApp
 
         public new void Dispose()
         {
-            // 관리 중인 프로세스 종료
-            if (_applicationLauncher != null)
-            {
-                _applicationLauncher.Cleanup();
-            }
+            // 상태 전송 타이머 정리
+            StopStatusTimer();
+
+            // 재연결 타이머 정리
+            StopReconnectTimer();
 
             // MQTT 서비스 정리
             if (_mqttService != null)

@@ -5,7 +5,6 @@ using System.IO.Compression;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using AppLauncher.Features.AppLaunching;
 using AppLauncher.Features.VersionManagement;
 using AppLauncher.Shared;
 using AppLauncher.Shared.Configuration;
@@ -20,18 +19,15 @@ namespace AppLauncher.Features.MqttControl
     {
         private readonly MqttService _mqttService;
         private readonly LauncherConfig _config;
-        private readonly ApplicationLauncher? _applicationLauncher;
         private readonly Action<string, string, int>? _showBalloonTipCallback;
 
         public MqttMessageHandler(
             MqttService mqttService,
             LauncherConfig config,
-            ApplicationLauncher? applicationLauncher = null,
             Action<string, string, int>? showBalloonTipCallback = null)
         {
             _mqttService = mqttService ?? throw new ArgumentNullException(nameof(mqttService));
             _config = config ?? throw new ArgumentNullException(nameof(config));
-            _applicationLauncher = applicationLauncher;
             _showBalloonTipCallback = showBalloonTipCallback;
         }
 
@@ -133,11 +129,48 @@ namespace AppLauncher.Features.MqttControl
                 // 하드웨어 UUID 가져오기
                 string hardwareUuid = HardwareInfo.GetHardwareUuid();
 
+                // LabVIEW 프로세스 상태 가져오기 (프로세스 이름으로 검색)
+                object labviewStatus;
+                Process? hbotProcess = FindHBOTOperatorProcess();
+
+                if (hbotProcess != null && !hbotProcess.HasExited)
+                {
+                    hbotProcess.Refresh(); // 최신 정보로 갱신
+
+                    var runningTime = DateTime.Now - hbotProcess.StartTime;
+                    long memoryMB = hbotProcess.WorkingSet64 / 1024 / 1024;
+
+                    labviewStatus = new
+                    {
+                        status = "running",
+                        processName = hbotProcess.ProcessName,
+                        pid = hbotProcess.Id,
+                        runningTime = $"{runningTime.Hours:D2}:{runningTime.Minutes:D2}:{runningTime.Seconds:D2}",
+                        memoryMB = memoryMB,
+                        responding = hbotProcess.Responding,
+                        threadCount = hbotProcess.Threads.Count,
+                    };
+                }
+                else
+                {
+                    labviewStatus = new
+                    {
+                        status = "stopped"
+                        processName = null,
+                        pid = null,
+                        runningTime = null,
+                        memoryMB = null,
+                        responding = null,
+                        threadCount = null,
+                    };
+                }
+
                 var status = new
                 {
                     status = statusMessage,
                     payload = new
                     {
+                        labviewStatus = labviewStatus,
                         location = _config.MqttSettings?.Location,
                         hardwareUUID = hardwareUuid,
                         launcher = new
@@ -238,6 +271,7 @@ namespace AppLauncher.Features.MqttControl
 
                 // 변경된 상태 전송
                 SendStatus("changeLocation");
+
                 SendStatusResponse("location_changed", $"Location changed from '{oldLocation}' to '{command.Location}'");
             }
             catch (Exception ex)
@@ -311,5 +345,41 @@ namespace AppLauncher.Features.MqttControl
                 return "1.0.0";
             }
         }
+
+        /// <summary>
+        /// HBOT Operator 프로세스 찾기 (config의 TargetExecutable 기반)
+        /// </summary>
+        private Process? FindHBOTOperatorProcess()
+        {
+            try
+            {
+                // config에서 TargetExecutable의 프로세스 이름 추출
+                string? targetProcessName = null;
+                if (!string.IsNullOrEmpty(_config.TargetExecutable))
+                {
+                    targetProcessName = Path.GetFileNameWithoutExtension(_config.TargetExecutable);
+                }
+
+                if (string.IsNullOrEmpty(targetProcessName))
+                {
+                    return null;
+                }
+
+                // 해당 프로세스 이름으로 검색
+                var processes = Process.GetProcessesByName(targetProcessName);
+                if (processes.Length > 0)
+                {
+                    return processes[0];
+                }
+
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+
     }
 }

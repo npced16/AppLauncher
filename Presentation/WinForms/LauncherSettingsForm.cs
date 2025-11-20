@@ -12,6 +12,7 @@ namespace AppLauncher.Presentation.WinForms
         private LauncherConfig _config;
 
         private TextBox targetExecutableTextBox;
+        private TextBox locationTextBox;
 
         private Button browseExecutableButton;
         private Button resetButton;
@@ -28,7 +29,7 @@ namespace AppLauncher.Presentation.WinForms
         private void InitializeComponent()
         {
             this.Text = "설정";
-            this.Size = new Size(600, 250);
+            this.Size = new Size(600, 300);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -61,11 +62,29 @@ namespace AppLauncher.Presentation.WinForms
             browseExecutableButton.Click += BrowseExecutableButton_Click;
             this.Controls.Add(browseExecutableButton);
 
+            // Location Label
+            var locationLabel = new Label
+            {
+                Text = "위치 (MQTT):",
+                Location = new Point(20, 85),
+                Size = new Size(120, 20)
+            };
+            this.Controls.Add(locationLabel);
+
+            // Location TextBox
+            locationTextBox = new TextBox
+            {
+                Location = new Point(20, 110),
+                Size = new Size(540, 25),
+                PlaceholderText = "예: 원주 본사/101호"
+            };
+            this.Controls.Add(locationTextBox);
+
             // Reset Button
             resetButton = new Button
             {
                 Text = "기본값 초기화",
-                Location = new Point(20, 120),
+                Location = new Point(20, 170),
                 Size = new Size(120, 35)
             };
             resetButton.Click += ResetButton_Click;
@@ -75,7 +94,7 @@ namespace AppLauncher.Presentation.WinForms
             saveButton = new Button
             {
                 Text = "저장",
-                Location = new Point(380, 120),
+                Location = new Point(380, 170),
                 Size = new Size(80, 35)
             };
             saveButton.Click += SaveButton_Click;
@@ -85,7 +104,7 @@ namespace AppLauncher.Presentation.WinForms
             cancelButton = new Button
             {
                 Text = "취소",
-                Location = new Point(480, 120),
+                Location = new Point(480, 170),
                 Size = new Size(80, 35)
             };
             cancelButton.Click += (s, e) => this.Close();
@@ -95,7 +114,7 @@ namespace AppLauncher.Presentation.WinForms
             versionLabel = new Label
             {
                 Text = $"런처 버전: {VersionInfo.LAUNCHER_VERSION}",
-                Location = new Point(20, 170),
+                Location = new Point(20, 220),
                 Size = new Size(200, 20),
                 ForeColor = Color.Gray
             };
@@ -110,6 +129,7 @@ namespace AppLauncher.Presentation.WinForms
 
                 // 현재 설정 표시
                 targetExecutableTextBox.Text = _config.TargetExecutable ?? "";
+                locationTextBox.Text = _config.MqttSettings?.Location ?? "";
             }
             catch (Exception ex)
             {
@@ -161,7 +181,13 @@ namespace AppLauncher.Presentation.WinForms
 
                 // 설정 저장
                 _config.TargetExecutable = targetExecutableTextBox.Text.Trim();
-                // LocalVersionFile은 기본값 유지
+
+                // MQTT Location 설정 저장
+                if (_config.MqttSettings == null)
+                {
+                    _config.MqttSettings = new MqttSettings();
+                }
+                _config.MqttSettings.Location = string.IsNullOrWhiteSpace(locationTextBox.Text) ? null : locationTextBox.Text.Trim();
 
                 ConfigManager.SaveConfig(_config);
 
