@@ -64,10 +64,11 @@ ignore:
 
 # Knowledge base
 knowledge_base:
-  - "이 프로젝트는 Windows Forms 기반 C# 애플리케이션입니다."
-  - "MQTT를 통한 원격 제어 기능을 제공합니다."
-  - "LabVIEW 애플리케이션 자동 업데이트 및 실행 관리 기능이 있습니다."
-  - ".NET 9.0 타겟 프레임워크를 사용합니다."
+  learnings:
+    - "이 프로젝트는 Windows Forms 기반 C# 애플리케이션입니다."
+    - "MQTT를 통한 원격 제어 기능을 제공합니다."
+    - "LabVIEW 애플리케이션 자동 업데이트 및 실행 관리 기능이 있습니다."
+    - ".NET 9.0 타겟 프레임워크를 사용합니다."
 
 # Chat settings
 chat:
