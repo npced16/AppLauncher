@@ -155,13 +155,13 @@ namespace AppLauncher.Features.MqttControl
                 {
                     labviewStatus = new
                     {
-                        status = "stopped"
-                        processName = null,
-                        pid = null,
-                        runningTime = null,
-                        memoryMB = null,
-                        responding = null,
-                        threadCount = null,
+                        status = "stopped",
+                        processName = (string?)null,
+                        pid = (int?)null,
+                        runningTime = (string?)null,
+                        memoryMB = (long?)null,
+                        responding = (bool?)null,
+                        threadCount = (int?)null
                     };
                 }
 
