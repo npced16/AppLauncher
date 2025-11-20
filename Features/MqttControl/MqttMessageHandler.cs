@@ -130,7 +130,7 @@ namespace AppLauncher.Features.MqttControl
                 string hardwareUuid = HardwareInfo.GetHardwareUuid();
 
                 // LabVIEW 프로세스 상태 가져오기 (프로세스 이름으로 검색)
-                object _labviewStatus;
+                object labviewStatus;
                 Process? hbotProcess = FindHBOTOperatorProcess();
 
                 if (hbotProcess != null && !hbotProcess.HasExited)
@@ -138,22 +138,22 @@ namespace AppLauncher.Features.MqttControl
                     hbotProcess.Refresh(); // 최신 정보로 갱신
 
                     var runningTime = DateTime.Now - hbotProcess.StartTime;
-                    long _memoryMB = hbotProcess.WorkingSet64 / 1024 / 1024;
+                    long memoryMB = hbotProcess.WorkingSet64 / 1024 / 1024;
 
-                    _labviewStatus = new
+                    labviewStatus = new
                     {
                         status = "running",
                         processName = hbotProcess.ProcessName,
                         pid = hbotProcess.Id,
                         runningTime = $"{runningTime.Hours:D2}:{runningTime.Minutes:D2}:{runningTime.Seconds:D2}",
-                        memoryMB = _memoryMB,
+                        memoryMB = memoryMB,
                         responding = hbotProcess.Responding,
                         threadCount = hbotProcess.Threads.Count,
                     };
                 }
                 else
                 {
-                    _labviewStatus = new
+                    labviewStatus = new
                     {
                         status = "stopped",
                         processName = (string?)null,
@@ -170,7 +170,7 @@ namespace AppLauncher.Features.MqttControl
                     status = statusMessage,
                     payload = new
                     {
-                        labviewStatus = _labviewStatus,
+                        labviewStatus = labviewStatus,
                         location = _config.MqttSettings?.Location,
                         hardwareUUID = hardwareUuid,
                         launcher = new
