@@ -1,4 +1,5 @@
 using AppLauncher.Features.MqttControl;
+using AppLauncher.Shared;
 using AppLauncher.Shared.Configuration;
 
 namespace AppLauncher.Shared.Services

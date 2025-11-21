@@ -28,7 +28,7 @@ namespace AppLauncher.Features.VersionManagement
         /// <summary>
         /// 업데이트 예약 저장
         /// </summary>
-        public static void SavePendingUpdate(PendingUpdate update)
+        public static bool SavePendingUpdate(PendingUpdate update)
         {
             try
             {
@@ -42,11 +42,12 @@ namespace AppLauncher.Features.VersionManagement
                 File.WriteAllText(PendingUpdateFilePath, json);
 
                 Console.WriteLine($"[PENDING] Update scheduled and saved: {PendingUpdateFilePath}");
+                return true;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[PENDING] Failed to save pending update: {ex.Message}");
-                throw;
+                return false;
             }
         }
 

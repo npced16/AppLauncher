@@ -3,7 +3,6 @@
   "mqttSettings": {
     "broker": "localhost",
     "port": 1883,
-    "topic": "applauncher/commands",
     "location": ""
   }
 }

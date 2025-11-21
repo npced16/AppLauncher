@@ -245,7 +245,7 @@ namespace AppLauncher
             }
             else
             {
-                startAppAndMQTT();
+                startSWApp();
             }
 
 
@@ -280,11 +280,11 @@ namespace AppLauncher
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning
                 );
-                startAppAndMQTT();
+                startSWApp();
             }
         }
 
-        private static void startAppAndMQTT()
+        private static void startSWApp()
         {
 
             // 업데이트가 없으면 백그라운드 프로그램 시작
@@ -311,9 +311,9 @@ namespace AppLauncher
                     }
                     else
                     {
-                        // 파일이 없으면 MQTT를 통해 서버에 업데이트 요청
+
                         DebugLog("[Main] 대상 파일이 존재하지 않음. 서버에 업데이트 요청...");
-                        _ = RequestLabViewUpdateFromServerAsync(config);
+                        _ = RequestUpdateCall();
                     }
                 }
                 else
@@ -332,15 +332,6 @@ namespace AppLauncher
                 DebugLog("[Main] Application.Run 시작");
                 Application.Run(trayContext);
                 DebugLog("[Main] Application.Run 종료");
-            }
-
-            // MQTT 서비스 정리
-            if (ServiceContainer.MqttService != null)
-            {
-                DebugLog("[Main] MQTT 서비스 정리 중...");
-                ServiceContainer.MqttService.DisconnectAsync().Wait();
-                ServiceContainer.MqttService.Dispose();
-                ServiceContainer.MqttService = null;
             }
 
             // 정리
@@ -416,126 +407,13 @@ namespace AppLauncher
         /// <summary>
         /// 서버에 LabVIEW 업데이트 요청 (파일 없을 때)
         /// </summary>
-        private static async Task RequestLabViewUpdateFromServerAsync(LauncherConfig config)
+        private static async Task RequestUpdateCall()
         {
-            try
-            {
-                if (ServiceContainer.MqttService == null)
-                {
-                    DebugLog("[UPDATE_REQUEST] 전역 MQTT 서비스가 초기화되지 않았습니다");
-                    return;
-                }
+            ServiceContainer.MqttMessageHandler.RequestLabViewUpdate("file_not_found");
 
-                DebugLog("[UPDATE_REQUEST] 전역 MQTT 서비스 사용");
-
-                // 메시지 수신 이벤트 핸들러
-                bool updateReceived = false;
-                LaunchCommand? receivedCommand = null;
-                TaskCompletionSource<bool> updateReceivedTcs = new TaskCompletionSource<bool>();
-
-                void MessageHandler(MqttMessage msg)
-                {
-                    try
-                    {
-                        ServiceContainer.MqttMessageHandler.HandleMessage(msg);
-                    }
-                    catch (Exception ex)
-                    {
-                        DebugLog($"[UPDATE_REQUEST] 메시지 처리 오류: {ex.Message}");
-                    }
-                }
-
-                // 임시 이벤트 핸들러 등록
-                ServiceContainer.MqttService.MessageReceived += MessageHandler;
-
-                try
-                {
-                    // MQTT 연결 (아직 연결되지 않은 경우)
-                    if (!ServiceContainer.MqttService.IsConnected)
-                    {
-                        DebugLog("[UPDATE_REQUEST] MQTT 연결 중...");
-                        await ServiceContainer.MqttService.ConnectAsync();
-
-                        if (!ServiceContainer.MqttService.IsConnected)
-                        {
-                            DebugLog("[UPDATE_REQUEST] MQTT 연결 실패");
-                            return;
-                        }
-
-                        DebugLog("[UPDATE_REQUEST] MQTT 연결 성공");
-                    }
-                    else
-                    {
-                        DebugLog("[UPDATE_REQUEST] 이미 MQTT 연결됨");
-                    }
-
-                    // 서버에 업데이트 요청 전송
-                    string hardwareUuid = HardwareInfo.GetHardwareUuid();
-                    var request = new
-                    {
-                        status = "labview_update_request",
-                        payload = new
-                        {
-                            reason = "file_not_found",
-                            currentVersion = "0.0.0",
-                            hardwareUUID = hardwareUuid,
-                            location = config.MqttSettings.Location,
-                            timestamp = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss")
-                        }
-                    };
-                    // SendStatus("labview_update_request");
-
-                    await ServiceContainer.MqttService.PublishJsonAsync(ServiceContainer.MqttService.StatusTopic, request);
-                    DebugLog("[UPDATE_REQUEST] 업데이트 요청 전송 완료");
-
-                    // 서버 응답 대기 (최대 30초)
-                    DebugLog("[UPDATE_REQUEST] 서버 응답 대기 중... (최대 30초)");
-                    var timeoutTask = Task.Delay(30000);
-                    var completedTask = await Task.WhenAny(updateReceivedTcs.Task, timeoutTask);
-
-                    if (completedTask == timeoutTask)
-                    {
-                        DebugLog("[UPDATE_REQUEST] 서버 응답 타임아웃 (30초)");
-                        return;
-                    }
-
-                    if (updateReceived && receivedCommand != null && !string.IsNullOrEmpty(receivedCommand.URL))
-                    {
-                        DebugLog($"[UPDATE_REQUEST] 다운로드 시작: {receivedCommand.URL}");
-
-                        // 다운로드 및 설치
-                        var updater = new LabViewUpdater(receivedCommand, config);
-                        string downloadedPath = await updater.DownloadAndExecuteAsync();
-
-                        if (!string.IsNullOrEmpty(downloadedPath))
-                        {
-                            DebugLog("[UPDATE_REQUEST] 설치 완료. 앱 실행...");
-
-                            // 설치 완료 후 앱 실행
-                            await Task.Delay(2000);
-                            if (File.Exists(config.TargetExecutable))
-                            {
-                                var launcher = new ApplicationLauncher();
-                                Action<string> statusCallback = status => DebugLog($"[LAUNCH] {status}");
-                                _ = launcher.CheckAndLaunchInBackgroundAsync(config, statusCallback);
-                            }
-                        }
-                        else
-                        {
-                            DebugLog("[UPDATE_REQUEST] 설치 실패");
-                        }
-                    }
-                }
-                finally
-                {
-                    // 임시 이벤트 핸들러 제거
-                    ServiceContainer.MqttService.MessageReceived -= MessageHandler;
-                }
-            }
-            catch (Exception ex)
-            {
-                DebugLog($"[UPDATE_REQUEST] 오류 발생: {ex.Message}");
-            }
         }
+
     }
+
+
 }

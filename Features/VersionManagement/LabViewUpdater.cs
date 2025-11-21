@@ -34,7 +34,7 @@ namespace AppLauncher.Features.VersionManagement
         /// <summary>
         /// 업데이트를 예약 (다음 런처 재시작 시 자동 실행)
         /// </summary>
-        public void ScheduleUpdate()
+        public void ScheduleUpdate(bool isDownloadImmediate)
         {
             try
             {
@@ -48,12 +48,71 @@ namespace AppLauncher.Features.VersionManagement
                     Description = $"챔버 소프트웨어 {_command.Version} 업데이트"
                 };
 
-                PendingUpdateManager.SavePendingUpdate(pendingUpdate);
-                Console.WriteLine("[SCHEDULE] Update scheduled successfully. Will be applied on next restart.");
+                bool saved = PendingUpdateManager.SavePendingUpdate(pendingUpdate);
+
+                if (!saved)
+                {
+                    Console.WriteLine("[SCHEDULE] Failed to save pending update");
+                    _sendStatusResponse?.Invoke("error", "업데이트 예약 저장 실패");
+                    return;
+                }
+
+                Console.WriteLine("[SCHEDULE] Update scheduled successfully.");
+
+                // 즉시 실행 모드: 런처 재시작하여 UpdateProgressForm으로 업데이트 진행
+                if (isDownloadImmediate && saved)
+                {
+                    Task.Delay(1000).ContinueWith(_ =>
+                    {
+                        RestartLauncher();
+                    });
+                }
+                else
+                {
+                    Console.WriteLine("[SCHEDULE] Will be applied on next restart.");
+                }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[SCHEDULE] Failed to schedule update: {ex.Message}");
+                _sendStatusResponse?.Invoke("error", ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 런처 재시작
+        /// </summary>
+        private void RestartLauncher()
+        {
+            try
+            {
+                Console.WriteLine("[RESTART] Restarting launcher...");
+
+                string exePath = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName ?? "";
+
+                if (!string.IsNullOrEmpty(exePath))
+                {
+                    var startInfo = new ProcessStartInfo
+                    {
+                        FileName = exePath,
+                        UseShellExecute = true
+                    };
+
+                    Process.Start(startInfo);
+                    Console.WriteLine("[RESTART] New launcher process started");
+
+                    // 현재 프로세스 종료
+                    //NOTE - 프로세스가 시작될떄 종료되긴하나 명시적으로 종료처리
+                    Environment.Exit(0);
+                }
+                else
+                {
+                    Console.WriteLine("[RESTART] Failed to get launcher path");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[RESTART] Failed to restart launcher: {ex.Message}");
             }
         }
 

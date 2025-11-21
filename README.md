@@ -170,7 +170,7 @@ flowchart TD
 ```json
 {
   "targetExecutable": "C:\\Program Files (x86)\\HBOT Operator\\HBOT Operator.exe",
-  "localVersionFile": "version.txt",
+  "localVersionFile": "labview_version.txt",
   "mqttSettings": {
     "broker": "localhost",
     "port": 1883,
@@ -187,4 +187,12 @@ flowchart TD
 
 ## 라이선스
 
-본 프로젝트는 HBOT 챔버 시스템 관리를 위한 내부 도구입니다.
+
+ ________________________________________________________________________________________
+< 본 프로젝트는 HBOT 챔버 시스템 관리를 위한 내부 도구입니다. >
+ ----------------------------------------------------------------------------------------
+        \
+         \
+          /\_/\  
+         ( o.o )  
+          > ^ <

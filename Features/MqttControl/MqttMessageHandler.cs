@@ -61,12 +61,12 @@ namespace AppLauncher.Features.MqttControl
 
                     case "LABVIEW_DOWNLOAD":
                     case "LABVIEWDOWNLOAD":
-                        UpdateLabView(command);
+                        UpdateLabView(command, true);
                         break;
 
                     case "LABVIEW_UPDATE":
                     case "LABVIEWUPDATE":
-                        UpdateLabView(command);
+                        UpdateLabView(command, false);
                         break;
 
                     case "LAUNCHER_UPDATE":
@@ -97,11 +97,11 @@ namespace AppLauncher.Features.MqttControl
         /// <summary>
         /// MQTT 명령으로 애플리케이션 실행
         /// </summary>
-        private void UpdateLabView(LaunchCommand command)
+        private async void UpdateLabView(LaunchCommand command, bool isDownloadImmediate)
         {
             try
             {
-                // url이 있으면 업데이트 예약 및 런처 재시작
+                // url이 있으면 업데이트 진행
                 if (!string.IsNullOrEmpty(command.URL))
                 {
                     var LabViewUpdater = new LabViewUpdater(
@@ -110,8 +110,8 @@ namespace AppLauncher.Features.MqttControl
                         SendStatusResponse
                      );
 
-                    // 업데이트를 예약하고 런처 재시작
-                    LabViewUpdater.ScheduleUpdate();
+
+                    LabViewUpdater.ScheduleUpdate(isDownloadImmediate);
                     return;
                 }
             }
@@ -312,8 +312,6 @@ namespace AppLauncher.Features.MqttControl
                         "업데이트가 완료되었습니다.\n컴퓨터를 재시작하면 새 버전이 적용됩니다.",
                         5000
                     );
-
-
                 }
             }
             catch (Exception)
@@ -347,7 +345,7 @@ namespace AppLauncher.Features.MqttControl
         }
 
         /// <summary>
-        /// HBOT Operator 프로세스 찾기 (config의 TargetExecutable 기반)
+        /// HBOT Operator 프로세스 찾기
         /// </summary>
         private Process? FindHBOTOperatorProcess()
         {
@@ -396,17 +394,26 @@ namespace AppLauncher.Features.MqttControl
                 string currentVersion = GetTargetAppVersion();
                 string hardwareUuid = HardwareInfo.GetHardwareUuid();
 
-                var request = new
+                var status = new
                 {
-                    requestType = "labview_update_request",
-                    reason = reason,
-                    currentVersion = currentVersion,
-                    hardwareUUID = hardwareUuid,
-                    location = _config.MqttSettings?.Location,
+                    status = "labview_update_request",
+                    payload = new
+                    {
+                        reason = reason,
+                        location = _config.MqttSettings?.Location,
+                        hardwareUUID = hardwareUuid,
+                        launcher = new
+                        {
+                            version = currentVersion
+                        },
+                        targetApp = new
+                        {
+                            version = "0.0.0"
+                        }
+                    },
                     timestamp = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss")
                 };
-
-                await _mqttService.PublishJsonAsync(_mqttService.StatusTopic, request);
+                await _mqttService.PublishJsonAsync(_mqttService.StatusTopic, status);
 
                 Console.WriteLine($"[MQTT] Update request sent - Reason: {reason}, Version: {currentVersion}");
             }
