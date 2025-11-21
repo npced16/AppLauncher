@@ -22,7 +22,7 @@ namespace AppLauncher.Features.MqttControl
 
         public MqttMessageHandler(
             MqttService mqttService,
-            LauncherConfig config,
+            LauncherConfig config
             )
         {
             _mqttService = mqttService ?? throw new ArgumentNullException(nameof(mqttService));

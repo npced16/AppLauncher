@@ -325,7 +325,6 @@ namespace AppLauncher
                                 {
                                     DebugLog($"[Main] MQTT 연결 실패: {ex.Message}");
                                 }
-                                Z
                                 if (mqtt.IsConnected)
                                 {
                                     RequestUpdateCall();
