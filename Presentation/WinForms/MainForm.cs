@@ -120,7 +120,6 @@ namespace AppLauncher.Presentation.WinForms
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = _config.TargetExecutable,
-                    UseShellExecute = true
                 };
 
                 // 작업 디렉토리는 실행 파일의 디렉토리로 자동 설정

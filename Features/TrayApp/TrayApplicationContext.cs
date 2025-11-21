@@ -113,20 +113,67 @@ namespace AppLauncher.Features.TrayApp
             _notifyIcon.ContextMenuStrip = contextMenu;
         }
 
-        private void ShowMainForm(object? sender, EventArgs e)
+        private async void ShowMainForm(object? sender, EventArgs e)
         {
-            if (_mainForm == null || _mainForm.IsDisposed)
+            try
             {
-                _mainForm = new MainForm();
-                _mainForm.FormClosed += (s, args) =>
+                var config = ConfigManager.LoadConfig();
+
+                // ServiceContainer의 ApplicationLauncher 사용
+                var launcher = ServiceContainer.AppLauncher;
+
+                if (launcher == null)
                 {
-                    _mainForm = null;
-                };
-                _mainForm.Show();
+                    // ApplicationLauncher가 아직 생성되지 않았으면 생성
+                    launcher = new ApplicationLauncher();
+                    ServiceContainer.AppLauncher = launcher;
+                }
+
+                // 현재 실행 중인 프로세스 확인
+                var runningProcess = launcher.GetRunningProcess();
+
+                if (runningProcess != null && runningProcess.IsRunning)
+                {
+                    MessageBox.Show(
+                        $"이미 실행 중입니다.\n\n{launcher.GetProcessStatusSummary()}",
+                        "앱 실행",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information
+                    );
+                    return;
+                }
+
+                // 파일 존재 확인
+                if (string.IsNullOrEmpty(config.TargetExecutable) || !File.Exists(config.TargetExecutable))
+                {
+                    MessageBox.Show(
+                        "대상 실행 파일이 설정되지 않았거나 존재하지 않습니다.\n설정에서 실행 파일을 지정해주세요.",
+                        "앱 실행",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning
+                    );
+                    return;
+                }
+
+                // 앱 실행
+                Action<string> statusCallback = status => DebugLog($"[LAUNCH] {status}");
+                await launcher.CheckAndLaunchInBackgroundAsync(config, statusCallback);
+
+                MessageBox.Show(
+                    "앱을 실행했습니다.",
+                    "앱 실행",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
             }
-            else
+            catch (Exception ex)
             {
-                _mainForm.Activate();
+                MessageBox.Show(
+                    $"앱 실행 오류:\n{ex.Message}",
+                    "오류",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
             }
         }
 

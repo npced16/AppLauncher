@@ -132,7 +132,6 @@ namespace AppLauncher
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = targetExePath,
-                    UseShellExecute = true,
                 };
                 Process.Start(startInfo);
 
@@ -311,6 +310,8 @@ namespace AppLauncher
                             try
                             {
                                 var launcher = new ApplicationLauncher();
+                                ServiceContainer.AppLauncher = launcher; // 전역 컨테이너에 저장
+
                                 Action<string> statusCallback = status => DebugLog($"[LAUNCH] {status}");
                                 await launcher.CheckAndLaunchInBackgroundAsync(config, statusCallback);
                                 DebugLog("[Main] 백그라운드 프로그램 시작 완료");

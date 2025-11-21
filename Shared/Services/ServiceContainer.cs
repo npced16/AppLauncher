@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using System.Timers;
 using AppLauncher.Features.MqttControl;
+using AppLauncher.Features.AppLaunching;
 using AppLauncher.Shared;
 using AppLauncher.Shared.Configuration;
 
@@ -15,6 +16,7 @@ namespace AppLauncher.Shared.Services
         public static MqttService? MqttService { get; private set; }
         public static MqttMessageHandler? MqttMessageHandler { get; private set; }
         public static LauncherConfig? Config { get; private set; }
+        public static ApplicationLauncher? AppLauncher { get; set; }
         private static readonly object _lock = new object();
         private static Timer? _statusTimer;
         /// <summary>
@@ -106,6 +108,30 @@ namespace AppLauncher.Shared.Services
         /// </summary>
         public static void Dispose()
         {
+            // ApplicationLauncher 정리 (관리 중인 프로세스 종료)
+            if (AppLauncher != null)
+            {
+                try
+                {
+                    Console.WriteLine("[ServiceContainer] ApplicationLauncher 정리 중...");
+                    AppLauncher.Cleanup();
+
+                    // 혹시 _managedProcess가 null인 경우를 대비해 프로세스 이름으로도 종료 시도
+                    if (Config != null && !string.IsNullOrEmpty(Config.TargetExecutable))
+                    {
+                        Console.WriteLine($"[ServiceContainer] 프로세스 이름으로 추가 종료 시도: {Config.TargetExecutable}");
+                        AppLauncher.CleanupByProcessName(Config.TargetExecutable);
+                    }
+
+                    Console.WriteLine("[ServiceContainer] ApplicationLauncher 정리 완료");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[ServiceContainer] ApplicationLauncher 정리 오류: {ex.Message}");
+                }
+                AppLauncher = null;
+            }
+
             // 타이머 정리
             if (_statusTimer != null)
             {

@@ -101,7 +101,6 @@ namespace AppLauncher.Features.VersionManagement
                     var startInfo = new ProcessStartInfo
                     {
                         FileName = exePath,
-                        UseShellExecute = true
                     };
 
                     Process.Start(startInfo);
@@ -385,7 +384,6 @@ namespace AppLauncher.Features.VersionManagement
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = executable,
-                    UseShellExecute = true
                 };
 
                 // 작업 디렉토리는 실행 파일의 디렉토리로 자동 설정
