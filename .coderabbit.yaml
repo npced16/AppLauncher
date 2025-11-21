@@ -120,15 +120,6 @@ path_instructions:
       - DPI 인식 설정 확인
       - 콘솔 출력 관리 (릴리즈 빌드에서 제거 고려)
 
-# Files to ignore
-ignore:
-  - "**/*.Designer.cs"
-  - "**/obj/**"
-  - "**/bin/**"
-  - "**/*.resx"
-  - "**/packages/**"
-  - "**/.vs/**"
-
 # Knowledge base
 knowledge_base:
   opt_out: false

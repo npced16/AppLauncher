@@ -1,9 +1,8 @@
 {
   "targetExecutable": "C:\\Program Files (x86)\\HBOT Operator\\HBOT Operator.exe",
   "mqttSettings": {
-    "broker": "server3.ibexserver.com",
+    "broker": "localhost",
     "port": 1883,
-    "topic": "applauncher/commands",
     "location": ""
   }
 }
