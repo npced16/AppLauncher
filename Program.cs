@@ -110,6 +110,11 @@ namespace AppLauncher
 
                 DebugLog("[설치] Program Files로 복사 시작...");
 
+                // 기존 AppLauncher 프로세스 종료
+                DebugLog("[설치] 기존 프로세스 종료 시도...");
+                KillExistingProcessesAtPath(targetExePath);
+                DebugLog("[설치] 기존 프로세스 종료 완료");
+
                 // Program Files로 복사
                 if (!Directory.Exists(targetDir))
                 {
@@ -389,6 +394,49 @@ namespace AppLauncher
             catch
             {
                 // 오류 무시
+            }
+        }
+
+        /// <summary>
+        /// 특정 경로에서 실행 중인 AppLauncher 프로세스 종료
+        /// </summary>
+        private static void KillExistingProcessesAtPath(string targetPath)
+        {
+            try
+            {
+                var currentProcess = Process.GetCurrentProcess();
+
+                // 같은 이름의 프로세스 찾기
+                var processes = Process.GetProcessesByName("AppLauncher")
+                    .Where(p => p.Id != currentProcess.Id)
+                    .ToList();
+
+                foreach (var process in processes)
+                {
+                    try
+                    {
+                        string? processPath = process.MainModule?.FileName;
+
+                        // 대상 경로와 일치하는 프로세스만 종료
+                        if (!string.IsNullOrEmpty(processPath) &&
+                            processPath.Equals(targetPath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            DebugLog($"[설치] 프로세스 종료: PID={process.Id}, Path={processPath}");
+                            process.Kill();
+                            process.WaitForExit(5000); // 5초 대기
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugLog($"[설치] 프로세스 종료 실패: {ex.Message}");
+                    }
+                }
+
+                Thread.Sleep(1000); // 프로세스가 완전히 종료될 때까지 대기
+            }
+            catch (Exception ex)
+            {
+                DebugLog($"[설치] KillExistingProcessesAtPath 오류: {ex.Message}");
             }
         }
 

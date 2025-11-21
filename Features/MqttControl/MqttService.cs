@@ -66,7 +66,11 @@ namespace AppLauncher.Features.MqttControl
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _clientId = clientId ?? throw new ArgumentNullException(nameof(clientId));
-            _fileLogger = new FileLogger("Logs", 90); // 90일(3개월) 보관
+
+            // ProgramData 경로 사용 (C:\ProgramData\AppLauncher\Logs)
+            string programDataPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+            string logPath = System.IO.Path.Combine(programDataPath, "AppLauncher", "Logs");
+            _fileLogger = new FileLogger(logPath, 90); // 90일(3개월) 보관
 
             // LogMessage 이벤트 발생 시 파일에도 기록
             LogMessage += (message) => _fileLogger.WriteLog(message, "MQTT");

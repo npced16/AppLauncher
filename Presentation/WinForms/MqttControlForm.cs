@@ -1,5 +1,7 @@
 using System;
 using System.Drawing;
+using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using AppLauncher.Features.MqttControl;
@@ -30,6 +32,7 @@ namespace AppLauncher.Presentation.WinForms
         {
             InitializeComponent();
             LoadSettings();
+            LoadTodayLogFile();
         }
 
         private void InitializeComponent()
@@ -400,6 +403,43 @@ namespace AppLauncher.Presentation.WinForms
             catch (Exception ex)
             {
                 AddLog($"❌ 설정 창 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 오늘의 로그 파일을 불러와서 표시
+        /// </summary>
+        private void LoadTodayLogFile()
+        {
+            try
+            {
+                // 로그 파일 경로 (C:\ProgramData\AppLauncher\Logs\MQTT_YYYYMMDD.log)
+                string programDataPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+                string logDirectory = Path.Combine(programDataPath, "AppLauncher", "Logs");
+                string logFileName = $"MQTT_{DateTime.Now:yyyyMMdd}.log";
+                string logFilePath = Path.Combine(logDirectory, logFileName);
+
+                if (File.Exists(logFilePath))
+                {
+                    // 파일 내용 읽기 (마지막 500줄만)
+                    var lines = File.ReadAllLines(logFilePath);
+                    int startIndex = Math.Max(0, lines.Length - 500);
+                    var recentLines = lines.Skip(startIndex);
+
+                    logTextBox.Text = string.Join("\r\n", recentLines);
+                    logTextBox.SelectionStart = logTextBox.Text.Length;
+                    logTextBox.ScrollToCaret();
+
+                    AddLog($"--- 로그 파일 로드 완료 (최근 {recentLines.Count()}줄) ---");
+                }
+                else
+                {
+                    AddLog("--- 오늘의 로그 파일이 아직 없습니다 ---");
+                }
+            }
+            catch (Exception ex)
+            {
+                AddLog($"--- 로그 파일 로드 오류: {ex.Message} ---");
             }
         }
 

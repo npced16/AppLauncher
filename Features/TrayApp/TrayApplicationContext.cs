@@ -34,10 +34,6 @@ namespace AppLauncher.Features.TrayApp
         {
             DebugLog("[TrayApplicationContext] InitializeTrayIcon 호출");
             InitializeTrayIcon();
-
-            DebugLog("[TrayApplicationContext] StartServices 호출");
-            StartServices();
-            DebugLog("[TrayApplicationContext] 생성자 완료");
         }
 
 
@@ -116,25 +112,6 @@ namespace AppLauncher.Features.TrayApp
 
             _notifyIcon.ContextMenuStrip = contextMenu;
         }
-
-        private void StartServices()
-        {
-            try
-            {
-                // 설정 로드
-                _config = ConfigManager.LoadConfig();
-
-                if (ServiceContainer.MqttService != null && ServiceContainer.MqttService.IsConnected)
-                {
-                    _mqttMessageHandler?.SendStatus("connected");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[TrayApplicationContext] MQTT 연결 실패: {ex.Message}");
-            }
-        }
-
 
         private void ShowMainForm(object? sender, EventArgs e)
         {
