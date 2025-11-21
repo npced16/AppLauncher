@@ -59,8 +59,8 @@ namespace AppLauncher.Features.MqttControl
                 switch (command.Command.ToUpper())
                 {
 
-                    case "LABVIEW_DOWNLOAD":
-                    case "LABVIEWDOWNLOAD":
+                    case "LABVIEW_UPDATE_IMMEDIATE":
+                    case "LABVIEWUPDATEIMMEDIATE":
                         UpdateLabView(command, true);
                         break;
 
@@ -278,8 +278,7 @@ namespace AppLauncher.Features.MqttControl
                 string oldLocation = config.MqttSettings.Location ?? "미설정";
                 config.MqttSettings.Location = command.Location;
 
-                // 변경된 상태 전송
-                SendStatus("changeLocation");
+                ConfigManager.SaveConfig(config);
 
                 SendStatusResponse("location_changed", $"Location changed from '{oldLocation}' to '{command.Location}'");
             }
@@ -391,7 +390,7 @@ namespace AppLauncher.Features.MqttControl
                 }
 
                 // 현재 버전 정보 수집
-                string currentVersion = GetTargetAppVersion();
+                string launcherVersion = VersionInfo.LAUNCHER_VERSION;
                 string hardwareUuid = HardwareInfo.GetHardwareUuid();
 
                 var status = new
@@ -404,7 +403,7 @@ namespace AppLauncher.Features.MqttControl
                         hardwareUUID = hardwareUuid,
                         launcher = new
                         {
-                            version = currentVersion
+                            version = launcherVersion
                         },
                         targetApp = new
                         {
@@ -415,7 +414,7 @@ namespace AppLauncher.Features.MqttControl
                 };
                 await _mqttService.PublishJsonAsync(_mqttService.StatusTopic, status);
 
-                Console.WriteLine($"[MQTT] Update request sent - Reason: {reason}, Version: {currentVersion}");
+                Console.WriteLine($"[MQTT] Update request sent - Reason: {reason}");
             }
             catch (Exception ex)
             {

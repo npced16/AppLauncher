@@ -176,6 +176,13 @@ namespace AppLauncher
 #else
             DebugLog("[Program] Debug 모드 - 자동 설치 스킵");
 #endif
+            // 업데이트가 없으면 백그라운드 프로그램 시작
+            DebugLog("[Main] 업데이트 없음. 백그라운드 프로그램 시작...");
+            var config = ConfigManager.LoadConfig();
+
+            // 서비스 컨테이너 초기화
+            DebugLog("[Main] ServiceContainer 초기화 중...");
+            ServiceContainer.Initialize(config);
 
             const string mutexName = "Global\\AppLauncher_SingleInstance";
             bool createdNew;
@@ -287,14 +294,7 @@ namespace AppLauncher
         private static void startSWApp()
         {
 
-            // 업데이트가 없으면 백그라운드 프로그램 시작
-            DebugLog("[Main] 업데이트 없음. 백그라운드 프로그램 시작...");
             var config = ConfigManager.LoadConfig();
-
-            // 서비스 컨테이너 초기화
-            DebugLog("[Main] ServiceContainer 초기화 중...");
-            ServiceContainer.Initialize(config);
-
             try
             {
                 // 파일 존재 여부 체크
@@ -311,9 +311,8 @@ namespace AppLauncher
                     }
                     else
                     {
-
                         DebugLog("[Main] 대상 파일이 존재하지 않음. 서버에 업데이트 요청...");
-                        _ = RequestUpdateCall();
+                        RequestUpdateCall();
                     }
                 }
                 else
@@ -407,10 +406,16 @@ namespace AppLauncher
         /// <summary>
         /// 서버에 LabVIEW 업데이트 요청 (파일 없을 때)
         /// </summary>
-        private static async Task RequestUpdateCall()
+        private static void RequestUpdateCall()
         {
-            ServiceContainer.MqttMessageHandler.RequestLabViewUpdate("file_not_found");
+            var handler = ServiceContainer.MqttMessageHandler;
+            if (handler == null)
+            {
+                DebugLog("[Main] MqttMessageHandler가 초기화되지 않아 업데이트 요청 불가");
+                return;
+            }
 
+            handler.RequestLabViewUpdate("file_not_found");
         }
 
     }

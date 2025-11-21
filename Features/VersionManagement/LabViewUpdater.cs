@@ -32,9 +32,11 @@ namespace AppLauncher.Features.VersionManagement
 
 
         /// <summary>
-        /// 업데이트를 예약 (다음 런처 재시작 시 자동 실행)
+        /// 업데이트를 예약
+        /// - isDownloadImmediate가 false인 경우: 다음 런처 재시작 시 자동 실행
+        /// - isDownloadImmediate가 true인 경우: 런처를 즉시 재시작하여 업데이트 진행
         /// </summary>
-        public void ScheduleUpdate(bool isDownloadImmediate)
+        public async void ScheduleUpdate(bool isDownloadImmediate)
         {
             try
             {
@@ -60,12 +62,10 @@ namespace AppLauncher.Features.VersionManagement
                 Console.WriteLine("[SCHEDULE] Update scheduled successfully.");
 
                 // 즉시 실행 모드: 런처 재시작하여 UpdateProgressForm으로 업데이트 진행
-                if (isDownloadImmediate && saved)
+                if (isDownloadImmediate)
                 {
-                    Task.Delay(1000).ContinueWith(_ =>
-                    {
-                        RestartLauncher();
-                    });
+                    await Task.Delay(1000);
+                    RestartLauncher();
                 }
                 else
                 {

@@ -19,6 +19,8 @@ namespace AppLauncher.Features.MqttControl
         private readonly MqttSettings _settings;
         private readonly string _clientId;
         private bool _isConnected;
+        private bool _isReconnecting;
+        private bool _isDisposed;
 
         /// <summary>
         /// MQTT 메시지 수신 이벤트
@@ -256,19 +258,60 @@ namespace AppLauncher.Features.MqttControl
             return Task.CompletedTask;
         }
 
-        private Task OnDisconnectedAsync(MqttClientDisconnectedEventArgs e)
+        private async Task OnDisconnectedAsync(MqttClientDisconnectedEventArgs e)
         {
             _isConnected = false;
             ConnectionStateChanged?.Invoke(false);
 
             LogMessage?.Invoke("MQTT 연결이 끊어졌습니다.");
 
-            // 자동 재연결 비활성화 - 사용자가 수동으로 재연결하도록
-            return Task.CompletedTask;
+            // 자동 재연결 시작 (Dispose 호출된 경우 제외)
+            if (!_isDisposed && !_isReconnecting)
+            {
+                _ = Task.Run(async () => await AutoReconnectAsync());
+            }
+        }
+
+        /// <summary>
+        /// 자동 재연결 로직 (60초 간격으로 시도)
+        /// </summary>
+        private async Task AutoReconnectAsync()
+        {
+            _isReconnecting = true;
+
+            while (!_isConnected && !_isDisposed)
+            {
+                try
+                {
+                    LogMessage?.Invoke("60초 후 자동 재연결 시도...");
+                    await Task.Delay(60000); // 60초 대기
+
+                    if (_isDisposed || _isConnected)
+                        break;
+
+                    LogMessage?.Invoke("MQTT 재연결 시도 중...");
+                    await ConnectAsync();
+
+                    if (_isConnected)
+                    {
+                        LogMessage?.Invoke("MQTT 재연결 성공!");
+                        break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogMessage?.Invoke($"재연결 실패: {ex.Message}");
+                }
+            }
+
+            _isReconnecting = false;
         }
 
         public void Dispose()
         {
+            _isDisposed = true;
+            _isReconnecting = false;
+
             if (_mqttClient != null)
             {
                 if (_mqttClient.IsConnected)

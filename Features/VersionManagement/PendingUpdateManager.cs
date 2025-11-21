@@ -47,7 +47,7 @@ namespace AppLauncher.Features.VersionManagement
             catch (Exception ex)
             {
                 Console.WriteLine($"[PENDING] Failed to save pending update: {ex.Message}");
-                return false;
+                throw;
             }
         }
 
