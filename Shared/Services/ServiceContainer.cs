@@ -25,7 +25,10 @@ namespace AppLauncher.Shared.Services
 
         /// <summary>
         /// 모든 서비스 초기화
+        /// <summary>
+        /// Initializes global services and configures MQTT client and message handling using the provided launcher configuration.
         /// </summary>
+        /// <param name="config">Launcher configuration that contains MQTT settings and other initialization parameters.</param>
         public static void Initialize(LauncherConfig config)
         {
             Config = config;
@@ -43,7 +46,12 @@ namespace AppLauncher.Shared.Services
 
         /// <summary>
         /// 모든 서비스 정리
+        /// <summary>
+        /// Releases and cleans up all services held by the ServiceContainer.
         /// </summary>
+        /// <remarks>
+        /// If an MQTT service exists, it will be disconnected and disposed, and all service references (MqttService, MqttMessageHandler, Config) will be cleared.
+        /// </remarks>
         public static void Dispose()
         {
             if (MqttService != null)

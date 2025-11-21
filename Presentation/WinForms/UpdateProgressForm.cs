@@ -60,6 +60,12 @@ namespace AppLauncher.Presentation.WinForms
             }
         }
 
+        /// <summary>
+        /// Builds and configures the full-screen update UI, creating and arranging the title label, center panel, progress bar, status and detail labels, and wiring resize and input handlers.
+        /// </summary>
+        /// <remarks>
+        /// Also configures the form to be topmost, borderless, and centered; initializes control styles and sizes; prevents cancellation via the Escape key and blocks form closing while an update is in progress.
+        /// </remarks>
         private void InitializeComponent()
         {
             // 전체화면 설정
@@ -162,6 +168,12 @@ namespace AppLauncher.Presentation.WinForms
             _ = StartUpdateAsync();
         }
 
+        /// <summary>
+        /// Executes the update flow by running the updater, updating UI progress and status, and performing post-update actions.
+        /// </summary>
+        /// <remarks>
+        /// On success the method triggers a system restart; on failure it restarts the existing launcher. Any error during the process sets the update as failed and updates the UI accordingly. The pending update is cleared and the update is marked completed in all cases.
+        /// </remarks>
         private async Task StartUpdateAsync()
         {
             try
@@ -250,7 +262,13 @@ namespace AppLauncher.Presentation.WinForms
 
         /// <summary>
         /// 업데이트 실패 시 런처 재시작 (LabVIEW 앱 + TrayApp 정상 실행)
+        /// <summary>
+        /// Restarts the launcher process after a failed update and closes the update form.
         /// </summary>
+        /// <remarks>
+        /// Updates the status shown to the user and, after a 2 second delay, closes this form, restarts the application, and exits the current process.
+        /// If an exception occurs while attempting the restart, the method logs the error and closes the form without restarting. 
+        /// </remarks>
         private void StartExistingApp()
         {
             try

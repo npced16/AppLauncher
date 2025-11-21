@@ -32,6 +32,9 @@ namespace AppLauncher.Features.TrayApp
 #endif
         }
 
+        /// <summary>
+        /// Initializes a new TrayApplicationContext, setting up the tray icon UI and starting background services.
+        /// </summary>
         public TrayApplicationContext()
         {
             DebugLog("[TrayApplicationContext] InitializeTrayIcon 호출");
@@ -43,6 +46,13 @@ namespace AppLauncher.Features.TrayApp
         }
 
 
+        /// <summary>
+        /// Creates and configures the system tray icon and its context menu for the application.
+        /// </summary>
+        /// <remarks>
+        /// Attempts to load an application icon (executable icon, then app_icon.ico) and falls back to the system application icon if none is found. Initializes a NotifyIcon (text set to "App Launcher", visible) and attaches a context menu with the following items wired to their handlers:
+        /// "앱 실행" (show main form), "설정" (launcher settings), "MQTT 제어 센터" (MQTT control), and "종료" (exit).
+        /// </remarks>
         private void InitializeTrayIcon()
         {
             // 아이콘 파일 로드 - 실행 파일에서 아이콘 추출 (가장 안전)
@@ -119,6 +129,12 @@ namespace AppLauncher.Features.TrayApp
             _notifyIcon.ContextMenuStrip = contextMenu;
         }
 
+        /// <summary>
+        /// Loads the launcher configuration and initializes MQTT status reporting when the global MQTT service is connected.
+        /// </summary>
+        /// <remarks>
+        /// Loads configuration from ConfigManager. If ServiceContainer.MqttService reports a connected state, sends a "connected" status message via the MQTT message handler and starts the periodic status timer. Any exceptions are reported to the user via a tray balloon tip.
+        /// </remarks>
         private void StartServices()
         {
             try
@@ -140,6 +156,10 @@ namespace AppLauncher.Features.TrayApp
 
 
 
+        /// <summary>
+        /// Handle changes in the MQTT connection state by starting or stopping timers and sending connection status messages.
+        /// </summary>
+        /// <param name="isConnected">`true` when the MQTT service is connected; `false` when disconnected.</param>
         private void OnMqttConnectionStateChanged(bool isConnected)
         {
             if (isConnected)
@@ -229,6 +249,12 @@ namespace AppLauncher.Features.TrayApp
             }
         }
 
+        /// <summary>
+        /// Handles the reconnect timer tick by attempting to establish an MQTT connection if the global MQTT service is disconnected.
+        /// </summary>
+        /// <remarks>
+        /// Writes a reconnect attempt message to the console and, if the global MQTT service exists and is not connected, calls its ConnectAsync method. Exceptions are caught and written to the console.
+        /// </remarks>
         private async void OnReconnectTimerElapsed(object? sender, ElapsedEventArgs e)
         {
             try
@@ -295,6 +321,14 @@ namespace AppLauncher.Features.TrayApp
             }
         }
 
+        /// <summary>
+        /// Shows the MQTT control window, creating and displaying a new MqttControlForm if one is not already open.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">Event arguments.</param>
+        /// <remarks>
+        /// When the control window is closed the reference is cleared and the launcher configuration is reloaded.
+        /// </remarks>
         private void ShowMqttControlWindow(object? sender, EventArgs e)
         {
             if (_mqttControlForm == null || _mqttControlForm.IsDisposed)
@@ -315,6 +349,14 @@ namespace AppLauncher.Features.TrayApp
             }
         }
 
+        /// <summary>
+        /// Closes open windows, disconnects the global MQTT service, cleans up resources, and terminates the process.
+        /// </summary>
+        /// <remarks>
+        /// Closes any active forms, disconnects ServiceContainer.MqttService if connected, disposes internal resources,
+        /// waits briefly to allow clean shutdown, and calls Environment.Exit(0). If an exception occurs during shutdown,
+        /// the exception is written to debug output and the process exits with code 1.
+        /// </remarks>
         private async void Exit(object? sender, EventArgs e)
         {
             try
@@ -358,6 +400,9 @@ namespace AppLauncher.Features.TrayApp
             }
         }
 
+        /// <summary>
+        /// Releases timers and tray icon resources used by the application context.
+        /// </summary>
         public new void Dispose()
         {
             // 상태 전송 타이머 정리

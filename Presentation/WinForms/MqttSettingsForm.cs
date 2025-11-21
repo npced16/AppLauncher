@@ -134,6 +134,12 @@ namespace AppLauncher.Presentation.WinForms
             this.Controls.Add(closeButton);
         }
 
+        /// <summary>
+        /// Loads the launcher configuration and applies MQTT-related values to the form's read-only labels.
+        /// </summary>
+        /// <remarks>
+        /// Updates brokerLabel and portLabel from the configuration, sets clientIdLabel to the hardware UUID, and sets locationLabel to the configured location or "미설정" when the location is null. If loading fails, an error message box is shown.
+        /// </remarks>
         private void LoadCurrentSettings()
         {
             try

@@ -21,6 +21,13 @@ namespace AppLauncher.Features.MqttControl
         private readonly LauncherConfig _config;
         private Action<string, string, int>? _showBalloonTipCallback;
 
+        /// <summary>
+        /// Initializes a new instance of <see cref="MqttMessageHandler"/> with the given MQTT service, launcher configuration, and optional balloon-tip callback.
+        /// </summary>
+        /// <param name="mqttService">The MQTT service used to publish and subscribe to topics; required.</param>
+        /// <param name="config">The launcher configuration used for status and update operations; required.</param>
+        /// <param name="showBalloonTipCallback">Optional callback invoked to display a balloon tip with title, message, and duration (seconds).</param>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="mqttService"/> or <paramref name="config"/> is null.</exception>
         public MqttMessageHandler(
             MqttService mqttService,
             LauncherConfig config,
@@ -34,7 +41,10 @@ namespace AppLauncher.Features.MqttControl
 
         /// <summary>
         /// Balloon Tip 콜백 설정 (나중에 설정 가능)
+        /// <summary>
+        /// Sets the callback used to display a balloon tip notification to the user.
         /// </summary>
+        /// <param name="callback">Delegate invoked to show a balloon tip. Parameters are: title, message, and display duration in seconds.</param>
         public void SetBalloonTipCallback(Action<string, string, int> callback)
         {
             _showBalloonTipCallback = callback;
@@ -42,7 +52,16 @@ namespace AppLauncher.Features.MqttControl
 
         /// <summary>
         /// MQTT 메시지 수신 처리
+        /// <summary>
+        /// Process an incoming MQTT message containing a LaunchCommand and dispatch corresponding actions.
         /// </summary>
+        /// <param name="message">The MQTT message whose Payload is a JSON-encoded LaunchCommand.</param>
+        /// <remarks>
+        /// Recognized command values (case-insensitive): LABVIEW_DOWNLOAD / LABVIEWDOWNLOAD, LABVIEW_UPDATE / LABVIEWUPDATE,
+        /// LAUNCHER_UPDATE / LAUNCHERUPDATE, STATUS, LOCATIONCHANGE / LOCATION_CHANGE. If the payload cannot be deserialized
+        /// to a LaunchCommand or deserializes to null, no action is taken. Exceptions thrown during message handling are caught
+        /// and ignored.
+        /// </remarks>
         public void HandleMessage(MqttMessage message)
         {
             try
@@ -212,7 +231,11 @@ namespace AppLauncher.Features.MqttControl
 
         /// <summary>
         /// 상태 응답 전송
+        /// <summary>
+        /// Publish a simple status response containing a status label and message to the MQTT install status topic.
         /// </summary>
+        /// <param name="status">A short status label (e.g., "ok", "error", "location_changed").</param>
+        /// <param name="message">A human-readable message or additional detail about the status.</param>
         private async void SendStatusResponse(string status, string message)
         {
             try
@@ -260,7 +283,10 @@ namespace AppLauncher.Features.MqttControl
 
         /// <summary>
         /// Location 변경 처리
+        /// <summary>
+        /// Updates the configured MQTT location to the value provided in the command and reports the change over MQTT.
         /// </summary>
+        /// <param name="command">Launch command whose Location property contains the new MQTT location; must be non-empty.</param>
         private void ChangeLocation(LaunchCommand command)
         {
             try
@@ -292,7 +318,11 @@ namespace AppLauncher.Features.MqttControl
 
         /// <summary>
         /// 런처 업데이트 실행
+        /// <summary>
+        /// Downloads a launcher update from the specified URL and replaces the current executable if an update is available.
         /// </summary>
+        /// <param name="downloadUrl">The URL to download the launcher update from.</param>
+        /// <remarks>When an updated executable is installed, the configured balloon-tip callback is invoked to notify the user. Exceptions occurring during the update process are ignored. </remarks>
         private async Task UpdateLauncherAsync(string downloadUrl)
         {
             try
@@ -348,7 +378,10 @@ namespace AppLauncher.Features.MqttControl
 
         /// <summary>
         /// HBOT Operator 프로세스 찾기 (config의 TargetExecutable 기반)
+        /// <summary>
+        /// Finds the first running process whose executable name (basename without extension) matches the configured TargetExecutable.
         /// </summary>
+        /// <returns>The matching <see cref="Process"/> if found and running; otherwise <c>null</c>.</returns>
         private Process? FindHBOTOperatorProcess()
         {
             try
@@ -381,7 +414,10 @@ namespace AppLauncher.Features.MqttControl
         }
         /// <summary>
         /// LabVIEW 앱이 없거나 오류 발생 시 서버에 업데이트 요청
+        /// <summary>
+        /// Publishes a LabVIEW update request to the configured MQTT status topic.
         /// </summary>
+        /// <param name="reason">A short description of why the update is being requested.</param>
         public async void RequestLabViewUpdate(string reason)
         {
             try

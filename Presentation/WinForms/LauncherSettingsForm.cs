@@ -154,6 +154,14 @@ namespace AppLauncher.Presentation.WinForms
 
 
 
+        /// <summary>
+        /// Validate input, update launcher settings from the form, persist them, and close the form on success.
+        /// </summary>
+        /// <remarks>
+        /// Prompts the user when required fields are empty or when the specified executable file does not exist; on confirmation, saves the target executable path and MQTT location into the current configuration and persists it via ConfigManager.SaveConfig. Displays success or error dialogs as appropriate.
+        /// </remarks>
+        /// <param name="sender">The source of the event (typically the Save button).</param>
+        /// <param name="e">Event data for the click event.</param>
         private void SaveButton_Click(object? sender, EventArgs e)
         {
             try

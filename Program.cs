@@ -152,6 +152,12 @@ namespace AppLauncher
 
 
 
+        /// <summary>
+        /// Application entry point that performs startup initialization and then launches either the update workflow or the normal application flow.
+        /// </summary>
+        /// <remarks>
+        /// Performs startup tasks such as cleaning up old files and logs, optionally installing to Program Files (Release builds), ensuring a single running instance, and registering a scheduled startup task if missing. Initializes WinForms settings and then routes to the pending-update handler or the regular background + tray application startup.
+        /// </remarks>
         [STAThread]
         static void Main()
         {
@@ -251,6 +257,15 @@ namespace AppLauncher
 
         }
 
+        /// <summary>
+        /// Handle a pending launcher update by displaying the update progress UI and performing the update.
+        /// </summary>
+        /// <remarks>
+        /// If a pending update is found, loads the configuration and runs <c>UpdateProgressForm</c> (blocks until the form closes)
+        /// to carry out the update, then returns. If no pending update is present this method returns without action.
+        /// On error while processing the update, a warning message box is shown, the error is logged, and the method falls back
+        /// to starting the regular application and MQTT flow via <c>startAppAndMQTT()</c>.
+        /// </remarks>
         private static void UpdateLauncher()
         {
             DebugLog("[Main] Pending update 발견! 업데이트 진행...");
@@ -284,6 +299,9 @@ namespace AppLauncher
             }
         }
 
+        /// <summary>
+        /// Initializes services, attempts to start the configured target application (or requests an update from the server if the target is missing), runs the tray application context, and performs MQTT and mutex cleanup on exit.
+        /// </summary>
         private static void startAppAndMQTT()
         {
 
@@ -390,6 +408,13 @@ namespace AppLauncher
         }
 
 
+        /// <summary>
+        /// Removes the AppLauncher entry from the current user's Windows Startup (HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run).
+        /// </summary>
+        /// <remarks>
+        /// If the Run key or the AppLauncher value is not present, the method does nothing.
+        /// On failure it displays a warning message box showing the error message.
+        /// </remarks>
         public static void UnregisterStartup()
         {
             try
@@ -415,7 +440,10 @@ namespace AppLauncher
 
         /// <summary>
         /// 서버에 LabVIEW 업데이트 요청 (파일 없을 때)
+        /// <summary>
+        /// Requests a LabVIEW update from the server over MQTT and, if an update URL is received, downloads, installs, and attempts to launch the updated application.
         /// </summary>
+        /// <param name="config">Launcher configuration containing MQTT settings, target executable path, and other values used for the request and post-download actions.</param>
         private static async Task RequestLabViewUpdateFromServerAsync(LauncherConfig config)
         {
             try

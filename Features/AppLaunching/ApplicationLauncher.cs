@@ -39,7 +39,11 @@ namespace AppLauncher.Features.AppLaunching
 
         /// <summary>
         /// 백그라운드에서 대상 프로그램 실행 
+        /// <summary>
+        /// Initiates launching of the configured target application and reports progress, result, and errors via the provided callback.
         /// </summary>
+        /// <param name="config">Launcher configuration containing the target executable to start.</param>
+        /// <param name="statusCallback">Callback invoked with human-readable status updates, success/failure messages, and error text.</param>
         public async Task CheckAndLaunchInBackgroundAsync(LauncherConfig config, Action<string> statusCallback)
         {
             try

@@ -26,6 +26,9 @@ namespace AppLauncher.Presentation.WinForms
         private Button clearLogButton;
         private Button closeButton;
 
+        /// <summary>
+        /// Initializes the form's user interface and loads MQTT configuration, attaching the UI to the global MQTT service.
+        /// </summary>
         public MqttControlForm()
         {
             InitializeComponent();
@@ -162,6 +165,15 @@ namespace AppLauncher.Presentation.WinForms
             this.Controls.Add(closeButton);
         }
 
+        /// <summary>
+        /// Loads MQTT settings from configuration, updates the form's broker/client/topic labels, and attaches to the global MQTT service.
+        /// </summary>
+        /// <remarks>
+        /// Loads configuration via ConfigManager, stores the result in the form's _settings, updates
+        /// brokerInfoLabel, clientIdLabel, and topicLabel using the service's ClientId, and then
+        /// subscribes to the global MQTT service events by calling AttachToExistingService.
+        /// Any exceptions encountered during loading are logged via AddLog with the prefix "❌ 설정 로드 오류".
+        /// </remarks>
         private void LoadSettings()
         {
             try
@@ -183,6 +195,12 @@ namespace AppLauncher.Presentation.WinForms
             }
         }
 
+        /// <summary>
+        /// Subscribes the form to the global MQTT service events and updates the UI to reflect the service's current connection state.
+        /// </summary>
+        /// <remarks>
+        /// Attaches handlers for connection state changes, log messages, and incoming messages, and records a log entry indicating the attachment.
+        /// </remarks>
         private void AttachToExistingService()
         {
             // 이벤트 구독
@@ -196,6 +214,10 @@ namespace AppLauncher.Presentation.WinForms
             OnConnectionStateChanged(_mqttService.IsConnected);
         }
 
+        /// <summary>
+        /// Updates UI controls to reflect the current MQTT connection state.
+        /// </summary>
+        /// <param name="isConnected">`true` when the MQTT service is connected; `false` otherwise.</param>
         private void OnConnectionStateChanged(bool isConnected)
         {
             if (InvokeRequired)
@@ -269,6 +291,13 @@ namespace AppLauncher.Presentation.WinForms
             logTextBox.ScrollToCaret();
         }
 
+        /// <summary>
+        /// Initiates an MQTT connection in response to the Connect button being clicked.
+        /// </summary>
+        /// <remarks>
+        /// Disables the Connect button and logs the attempt, then attempts to connect via the application's MQTT service.
+        /// On success logs a confirmation message; on failure logs the error message and re-enables the Connect button.
+        /// </remarks>
         private async void ConnectButton_Click(object? sender, EventArgs e)
         {
             try
@@ -287,6 +316,11 @@ namespace AppLauncher.Presentation.WinForms
             }
         }
 
+        /// <summary>
+        /// Initiates an orderly MQTT disconnect, updates the connect/disconnect button states, and records progress and any errors to the log.
+        /// </summary>
+        /// <param name="sender">The control that raised the click event.</param>
+        /// <param name="e">Click event arguments (unused).</param>
         private async void DisconnectButton_Click(object? sender, EventArgs e)
         {
             try
@@ -308,6 +342,15 @@ namespace AppLauncher.Presentation.WinForms
             }
         }
 
+        /// <summary>
+        /// Initiates a full MQTT reconnection sequence when the Reconnect button is clicked.
+        /// </summary>
+        /// <remarks>
+        /// Disables the reconnect button, logs the attempt, disconnects first if already connected (with a short delay),
+        /// then attempts to connect. Logs success or failure and always re-enables the button when finished.
+        /// </remarks>
+        /// <param name="sender">The control that raised the event.</param>
+        /// <param name="e">Event data for the click event.</param>
         private async void ReconnectButton_Click(object? sender, EventArgs e)
         {
             try
@@ -363,6 +406,10 @@ namespace AppLauncher.Presentation.WinForms
             }
         }
 
+        /// <summary>
+        /// Detaches the form's MQTT event handlers when the form is closing so the form stops receiving updates; the global MQTT service instance is not disposed.
+        /// </summary>
+        /// <param name="e">Event data describing the form closing operation.</param>
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             // 창이 닫힐 때 이벤트만 정리 (서비스는 유지)
