@@ -198,25 +198,43 @@ namespace AppLauncher.Presentation.WinForms
 
         private void OnConnectionStateChanged(bool isConnected)
         {
+            // Form이 이미 Dispose된 경우 무시
+            if (IsDisposed)
+                return;
+
             if (InvokeRequired)
             {
-                Invoke(new Action<bool>(OnConnectionStateChanged), isConnected);
+                try
+                {
+                    Invoke(new Action<bool>(OnConnectionStateChanged), isConnected);
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Form이 닫히는 중이면 무시
+                }
                 return;
             }
 
-            if (isConnected)
+            try
             {
-                connectionStatusLabel.Text = "연결됨";
-                connectionStatusLabel.ForeColor = Color.Green;
-                connectButton.Enabled = false;
-                disconnectButton.Enabled = true;
+                if (isConnected)
+                {
+                    connectionStatusLabel.Text = "연결됨";
+                    connectionStatusLabel.ForeColor = Color.Green;
+                    connectButton.Enabled = false;
+                    disconnectButton.Enabled = true;
+                }
+                else
+                {
+                    connectionStatusLabel.Text = "연결 안됨";
+                    connectionStatusLabel.ForeColor = Color.Red;
+                    connectButton.Enabled = true;
+                    disconnectButton.Enabled = false;
+                }
             }
-            else
+            catch (ObjectDisposedException)
             {
-                connectionStatusLabel.Text = "연결 안됨";
-                connectionStatusLabel.ForeColor = Color.Red;
-                connectButton.Enabled = true;
-                disconnectButton.Enabled = false;
+                // Form이 닫히는 중이면 무시
             }
         }
 
@@ -227,6 +245,10 @@ namespace AppLauncher.Presentation.WinForms
 
         private void OnMessageReceived(MqttMessage message)
         {
+            // Form이 이미 Dispose된 경우 무시
+            if (IsDisposed)
+                return;
+
             AddLog($"[메시지 수신] 토픽: {message.Topic}");
 
             // JSON 파싱 시도 후 예쁘게 출력
@@ -246,27 +268,45 @@ namespace AppLauncher.Presentation.WinForms
 
         private void AddLog(string message)
         {
+            // Form이나 TextBox가 이미 Dispose된 경우 무시
+            if (IsDisposed || logTextBox.IsDisposed)
+                return;
+
             if (InvokeRequired)
             {
-                Invoke(new Action<string>(AddLog), message);
+                try
+                {
+                    Invoke(new Action<string>(AddLog), message);
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Form이 닫히는 중이면 무시
+                }
                 return;
             }
 
-            var timestamp = DateTime.Now.ToString("HH:mm:ss");
-            var logEntry = $"[{timestamp}] {message}\r\n";
-
-            if (logTextBox.Text == "로그가 여기에 표시됩니다...")
+            try
             {
-                logTextBox.Text = logEntry;
-            }
-            else
-            {
-                logTextBox.AppendText(logEntry);
-            }
+                var timestamp = DateTime.Now.ToString("HH:mm:ss");
+                var logEntry = $"[{timestamp}] {message}\r\n";
 
-            // 자동 스크롤
-            logTextBox.SelectionStart = logTextBox.Text.Length;
-            logTextBox.ScrollToCaret();
+                if (logTextBox.Text == "로그가 여기에 표시됩니다...")
+                {
+                    logTextBox.Text = logEntry;
+                }
+                else
+                {
+                    logTextBox.AppendText(logEntry);
+                }
+
+                // 자동 스크롤
+                logTextBox.SelectionStart = logTextBox.Text.Length;
+                logTextBox.ScrollToCaret();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Form이 닫히는 중이면 무시
+            }
         }
 
         private async void ConnectButton_Click(object? sender, EventArgs e)

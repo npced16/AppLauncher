@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using MQTTnet;
 using AppLauncher.Shared.Configuration;
+using AppLauncher.Shared.Logger;
 using Newtonsoft.Json;
 
 namespace AppLauncher.Features.MqttControl
@@ -21,6 +22,7 @@ namespace AppLauncher.Features.MqttControl
         private bool _isConnected;
         private volatile bool _isReconnecting;
         private volatile bool _isDisposed;
+        private readonly FileLogger _fileLogger;
 
         /// <summary>
         /// MQTT 메시지 수신 이벤트
@@ -64,6 +66,10 @@ namespace AppLauncher.Features.MqttControl
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _clientId = clientId ?? throw new ArgumentNullException(nameof(clientId));
+            _fileLogger = new FileLogger("Logs", 90); // 90일(3개월) 보관
+
+            // LogMessage 이벤트 발생 시 파일에도 기록
+            LogMessage += (message) => _fileLogger.WriteLog(message, "MQTT");
         }
 
         /// <summary>
@@ -268,7 +274,7 @@ namespace AppLauncher.Features.MqttControl
             return Task.CompletedTask;
         }
 
-        private async Task OnDisconnectedAsync(MqttClientDisconnectedEventArgs e)
+        private Task OnDisconnectedAsync(MqttClientDisconnectedEventArgs e)
         {
             _isConnected = false;
             ConnectionStateChanged?.Invoke(false);
@@ -280,6 +286,8 @@ namespace AppLauncher.Features.MqttControl
             {
                 _ = Task.Run(async () => await AutoReconnectAsync());
             }
+
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -348,6 +356,9 @@ namespace AppLauncher.Features.MqttControl
                 _mqttClient.Dispose();
                 _mqttClient = null;
             }
+
+            // FileLogger 정리
+            _fileLogger?.Dispose();
 
             // 이벤트 구독자 정리
             MessageReceived = null;

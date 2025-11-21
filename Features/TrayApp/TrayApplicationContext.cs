@@ -22,7 +22,6 @@ namespace AppLauncher.Features.TrayApp
         private LauncherSettingsForm? _launcherSettingsForm;
         private MqttMessageHandler _mqttMessageHandler => ServiceContainer.MqttMessageHandler!;
         private LauncherConfig? _config;
-        private System.Timers.Timer? _statusTimer;
 
         private static void DebugLog(string message)
         {
@@ -132,7 +131,7 @@ namespace AppLauncher.Features.TrayApp
             }
             catch (Exception ex)
             {
-
+                Console.WriteLine($"[TrayApplicationContext] MQTT 연결 실패: {ex.Message}");
             }
         }
 

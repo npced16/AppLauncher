@@ -251,7 +251,7 @@ namespace AppLauncher.Presentation.WinForms
         /// <summary>
         /// 업데이트 실패 시 런처 재시작 (LabVIEW 앱 + TrayApp 정상 실행)
         /// </summary>
-        private void StartExistingApp()
+        private async void StartExistingApp()
         {
             try
             {
@@ -260,25 +260,22 @@ namespace AppLauncher.Presentation.WinForms
 
                 Console.WriteLine("[UPDATE] Restarting launcher after update failure");
 
-                // 2초 후 런처 재시작
-                Task.Delay(2000).ContinueWith(_ =>
+                await Task.Delay(2000);
+                if (InvokeRequired)
                 {
-                    if (InvokeRequired)
-                    {
-                        Invoke(new Action(() =>
-                        {
-                            this.Close();
-                            Application.Restart();
-                            Environment.Exit(0);
-                        }));
-                    }
-                    else
+                    Invoke(new Action(() =>
                     {
                         this.Close();
                         Application.Restart();
                         Environment.Exit(0);
-                    }
-                });
+                    }));
+                }
+                else
+                {
+                    this.Close();
+                    Application.Restart();
+                    Environment.Exit(0);
+                }
             }
             catch (Exception ex)
             {

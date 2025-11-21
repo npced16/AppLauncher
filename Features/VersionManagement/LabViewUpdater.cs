@@ -221,6 +221,11 @@ namespace AppLauncher.Features.VersionManagement
                     Directory.CreateDirectory(tempDir);
 
                 // 파일명 추출
+                if (string.IsNullOrEmpty(_command.URL))
+                {
+                    Console.WriteLine("[LabViewUpdater] URL이 비어있습니다.");
+                    return "";
+                }
                 string fileName = Path.GetFileName(new Uri(_command.URL).LocalPath);
                 bool isZipFile = fileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase);
                 bool isExeFile = fileName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase);
@@ -232,7 +237,7 @@ namespace AppLauncher.Features.VersionManagement
                 }
 
                 string downloadPath = Path.Combine(tempDir, fileName);
-                _sendStatusResponse("download_start", "파일 다운로드 시작");
+                _sendStatusResponse?.Invoke("download_start", "파일 다운로드 시작");
                 // HttpClient로 다운로드
                 using (var httpClient = new System.Net.Http.HttpClient())
                 {
@@ -244,20 +249,20 @@ namespace AppLauncher.Features.VersionManagement
                     {
                         await response.Content.CopyToAsync(fs);
                     }
-                    _sendStatusResponse("download_complete", "파일 다운로드 완료");
+                    _sendStatusResponse?.Invoke("download_complete", "파일 다운로드 완료");
                 }
 
                 if (!File.Exists(downloadPath))
                 {
                     return "";
                 }
-                _sendStatusResponse("extract_start", "압축 해제 시작");
+                _sendStatusResponse?.Invoke("extract_start", "압축 해제 시작");
 
                 // zip 파일이면 압축 해제
                 if (isZipFile)
                 {
                     await ExtractZipFileAsync(downloadPath);
-                    _sendStatusResponse("extract_done", "압축 해제 완료");
+                    _sendStatusResponse?.Invoke("extract_done", "압축 해제 완료");
 
                 }
                 else
@@ -270,6 +275,7 @@ namespace AppLauncher.Features.VersionManagement
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"[LabViewUpdater] 다운로드 및 실행 오류: {ex.Message}");
                 return "";
             }
         }
@@ -510,7 +516,7 @@ namespace AppLauncher.Features.VersionManagement
                 }
 
                 // 부모 프로세스가 지정된 경우, 해당 부모의 자손 프로세스만 필터링
-                int[] targetPids = null;
+                int[]? targetPids = null;
                 if (parentProcessId.HasValue)
                 {
                     targetPids = GetAllDescendantProcessIds(parentProcessId.Value);
@@ -673,7 +679,7 @@ Write-Output ""CleanupComplete""
                 // 설치 전 setting.ini 파일 백업
                 var backupSettingFile = BackupSettingFile();
 
-                _sendStatusResponse("installation_start", "설치 시작");
+                _sendStatusResponse?.Invoke("installation_start", "설치 시작");
                 var psProcess = Process.Start(startInfo);
                 if (psProcess != null)
                 {
@@ -728,7 +734,7 @@ Write-Output ""CleanupComplete""
                         var sb = new System.Text.StringBuilder();
                         while (!psProcess.StandardOutput.EndOfStream)
                         {
-                            string line = psProcess.StandardOutput.ReadLine();
+                            string? line = psProcess.StandardOutput.ReadLine();
                             if (line != null)
                             {
                                 sb.AppendLine(line);
@@ -834,7 +840,7 @@ Write-Output ""CleanupComplete""
                     }
                     else
                     {
-                        _sendStatusResponse("installation_complete", "설치 완료");
+                        _sendStatusResponse?.Invoke("installation_complete", "설치 완료");
                         Console.WriteLine($"[SUCCESS] Installation completed");
                         Console.WriteLine($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                         RestoreSettingFile(backupSettingFile);
@@ -861,12 +867,12 @@ Write-Output ""CleanupComplete""
                         }
                         File.WriteAllText(_config.LocalVersionFile, _command.Version);
                         Console.WriteLine($"Version file saved: {_command.Version}");
-                        _sendStatusResponse("version_saved", $"버전 파일 저장: {_command.Version}");
+                        _sendStatusResponse?.Invoke("version_saved", $"버전 파일 저장: {_command.Version}");
                     }
                     catch (Exception versionEx)
                     {
                         Console.WriteLine($"Failed to save version file: {versionEx.Message}");
-                        _sendStatusResponse("version_save_error", versionEx.Message);
+                        _sendStatusResponse?.Invoke("version_save_error", versionEx.Message);
                     }
                 }
 
@@ -877,7 +883,7 @@ Write-Output ""CleanupComplete""
                 Console.WriteLine($"Stack Trace:\n{ex.StackTrace}");
                 Console.WriteLine($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
 
-                _sendStatusResponse("error", ex.Message);
+                _sendStatusResponse?.Invoke("error", ex.Message);
             }
         }
 
