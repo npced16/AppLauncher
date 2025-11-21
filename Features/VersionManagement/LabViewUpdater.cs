@@ -36,7 +36,7 @@ namespace AppLauncher.Features.VersionManagement
         /// - isDownloadImmediate가 false인 경우: 다음 런처 재시작 시 자동 실행
         /// - isDownloadImmediate가 true인 경우: 런처를 즉시 재시작하여 업데이트 진행
         /// </summary>
-        public async void ScheduleUpdate(bool isDownloadImmediate)
+        public async Task ScheduleUpdate(bool isDownloadImmediate)
         {
             try
             {

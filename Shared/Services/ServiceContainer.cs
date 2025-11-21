@@ -16,7 +16,7 @@ namespace AppLauncher.Shared.Services
         public static LauncherConfig? Config { get; private set; }
         private static readonly object _lock = new object();
         /// <summary>
-        /// 모든 서비스 초기화
+        /// 모든 서비스 초기화 및 MQTT 연결 시작
         /// </summary>
         public static void Initialize(LauncherConfig config)
         {
@@ -36,6 +36,20 @@ namespace AppLauncher.Shared.Services
 
                 // MQTT 메시지 수신 이벤트 연결
                 MqttService.MessageReceived += (msg) => MqttMessageHandler?.HandleMessage(msg);
+
+                // MQTT 연결 시작 (백그라운드에서 비동기 실행)
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await MqttService.ConnectAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[ServiceContainer] MQTT 초기 연결 실패: {ex.Message}");
+                        // 자동 재연결 로직이 작동하므로 예외 무시
+                    }
+                });
             }
         }
 
@@ -50,6 +64,9 @@ namespace AppLauncher.Shared.Services
             {
                 try
                 {
+                    // 이벤트 핸들러 제거 (메모리 누수 방지)
+                    mqttService.MessageReceived -= (msg) => MqttMessageHandler?.HandleMessage(msg);
+
                     // 연결되어 있으면 끊기
                     if (mqttService.IsConnected)
                     {

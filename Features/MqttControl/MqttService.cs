@@ -19,8 +19,8 @@ namespace AppLauncher.Features.MqttControl
         private readonly MqttSettings _settings;
         private readonly string _clientId;
         private bool _isConnected;
-        private bool _isReconnecting;
-        private bool _isDisposed;
+        private volatile bool _isReconnecting;
+        private volatile bool _isDisposed;
 
         /// <summary>
         /// MQTT 메시지 수신 이벤트
@@ -76,8 +76,18 @@ namespace AppLauncher.Features.MqttControl
                 LogMessage?.Invoke($"MQTT 연결 시도: {_settings.Broker}:{_settings.Port}");
 
                 var factory = new MqttClientFactory();
+
+                // 기존 클라이언트가 있으면 이벤트 핸들러 제거 후 정리
+                if (_mqttClient != null)
+                {
+                    _mqttClient.ApplicationMessageReceivedAsync -= OnMessageReceivedAsync;
+                    _mqttClient.DisconnectedAsync -= OnDisconnectedAsync;
+                    _mqttClient.Dispose();
+                }
+
                 _mqttClient = factory.CreateMqttClient();
 
+                // 이벤트 핸들러 등록 (중복 방지됨)
                 _mqttClient.ApplicationMessageReceivedAsync += OnMessageReceivedAsync;
                 _mqttClient.DisconnectedAsync += OnDisconnectedAsync;
 
@@ -273,23 +283,25 @@ namespace AppLauncher.Features.MqttControl
         }
 
         /// <summary>
-        /// 자동 재연결 로직 (60초 간격으로 시도)
+        /// 자동 재연결 로직 (60초 간격으로 시도, 최대 100회)
         /// </summary>
         private async Task AutoReconnectAsync()
         {
             _isReconnecting = true;
+            int retryCount = 0;
+            const int maxRetries = 100; // 최대 100회 (약 100분)
 
-            while (!_isConnected && !_isDisposed)
+            while (!_isConnected && !_isDisposed && retryCount < maxRetries)
             {
                 try
                 {
-                    LogMessage?.Invoke("60초 후 자동 재연결 시도...");
+                    LogMessage?.Invoke($"60초 후 자동 재연결 시도... ({retryCount + 1}/{maxRetries})");
                     await Task.Delay(60000); // 60초 대기
 
                     if (_isDisposed || _isConnected)
                         break;
 
-                    LogMessage?.Invoke("MQTT 재연결 시도 중...");
+                    LogMessage?.Invoke($"MQTT 재연결 시도 중... ({retryCount + 1}/{maxRetries})");
                     await ConnectAsync();
 
                     if (_isConnected)
@@ -302,6 +314,13 @@ namespace AppLauncher.Features.MqttControl
                 {
                     LogMessage?.Invoke($"재연결 실패: {ex.Message}");
                 }
+
+                retryCount++;
+            }
+
+            if (retryCount >= maxRetries)
+            {
+                LogMessage?.Invoke($"[경고] 최대 재연결 시도 횟수({maxRetries})에 도달했습니다. 재연결을 중단합니다.");
             }
 
             _isReconnecting = false;
@@ -314,13 +333,26 @@ namespace AppLauncher.Features.MqttControl
 
             if (_mqttClient != null)
             {
+                // 이벤트 핸들러 제거 (메모리 누수 방지)
+                _mqttClient.ApplicationMessageReceivedAsync -= OnMessageReceivedAsync;
+                _mqttClient.DisconnectedAsync -= OnDisconnectedAsync;
+
                 if (_mqttClient.IsConnected)
                 {
-                    _mqttClient.DisconnectAsync().Wait();
+                    // ConfigureAwait(false).GetAwaiter().GetResult()가 더 안전
+                    _mqttClient.DisconnectAsync()
+                        .ConfigureAwait(false)
+                        .GetAwaiter()
+                        .GetResult();
                 }
                 _mqttClient.Dispose();
                 _mqttClient = null;
             }
+
+            // 이벤트 구독자 정리
+            MessageReceived = null;
+            ConnectionStateChanged = null;
+            LogMessage = null;
         }
     }
 

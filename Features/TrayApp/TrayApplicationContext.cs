@@ -125,77 +125,16 @@ namespace AppLauncher.Features.TrayApp
                 // 설정 로드
                 _config = ConfigManager.LoadConfig();
 
-                if (ServiceContainer.MqttService.IsConnected)
+                if (ServiceContainer.MqttService != null && ServiceContainer.MqttService.IsConnected)
                 {
                     _mqttMessageHandler?.SendStatus("connected");
-                    StartStatusTimer();
                 }
             }
             catch (Exception ex)
             {
+
             }
         }
-
-
-
-        private void OnMqttConnectionStateChanged(bool isConnected)
-        {
-            if (isConnected)
-            {
-                // 연결 성공 시 초기 상태 전송
-                _mqttMessageHandler?.SendStatus("connected");
-
-                // 1분마다 상태 전송 타이머 시작
-                StartStatusTimer();
-            }
-            else
-            {
-                // 연결 끊어지면 상태 타이머 중지
-                StopStatusTimer();
-            }
-        }
-
-        private void StartStatusTimer()
-        {
-            // 기존 타이머가 있으면 중지
-            StopStatusTimer();
-
-            // 1분(60초) 간격으로 타이머 생성
-            _statusTimer = new System.Timers.Timer(60000);
-            _statusTimer.Elapsed += OnStatusTimerElapsed;
-            _statusTimer.AutoReset = true;
-            _statusTimer.Start();
-            Console.WriteLine("[MQTT] Status timer started (interval: 60 seconds)");
-        }
-
-        private void StopStatusTimer()
-        {
-            if (_statusTimer != null)
-            {
-                _statusTimer.Stop();
-                _statusTimer.Elapsed -= OnStatusTimerElapsed;
-                _statusTimer.Dispose();
-                _statusTimer = null;
-
-                Console.WriteLine("[MQTT] Status timer stopped");
-            }
-        }
-
-        private void OnStatusTimerElapsed(object? sender, ElapsedEventArgs e)
-        {
-            try
-            {
-                // 1분마다 자동으로 상태 전송
-                _mqttMessageHandler?.SendStatus("current_status");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[MQTT] Status timer error: {ex.Message}");
-            }
-        }
-
-
-
 
 
         private void ShowMainForm(object? sender, EventArgs e)
@@ -271,14 +210,6 @@ namespace AppLauncher.Features.TrayApp
                 {
                     _launcherSettingsForm.Close();
                 }
-
-                // MQTT 연결 해제
-                if (ServiceContainer.MqttService != null && ServiceContainer.MqttService.IsConnected)
-                {
-                    await ServiceContainer.MqttService.DisconnectAsync();
-                    await Task.Delay(500); // MQTT 연결 해제 대기
-                }
-
                 // 리소스 정리
                 Dispose();
 
@@ -299,9 +230,6 @@ namespace AppLauncher.Features.TrayApp
 
         public new void Dispose()
         {
-            // 상태 전송 타이머 정리
-            StopStatusTimer();
-
             // 트레이 아이콘 정리
             if (_notifyIcon != null)
             {

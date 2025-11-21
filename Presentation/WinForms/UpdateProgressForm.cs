@@ -284,7 +284,6 @@ namespace AppLauncher.Presentation.WinForms
             {
                 Console.WriteLine($"[UPDATE] Failed to restart launcher: {ex.Message}");
 
-                // 실패 시 그냥 폼만 닫기
                 this.Close();
             }
         }

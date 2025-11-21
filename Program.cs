@@ -300,37 +300,28 @@ namespace AppLauncher
                 {
                     if (File.Exists(config.TargetExecutable))
                     {
-                        // 파일이 있으면 정상 실행
-                        var launcher = new ApplicationLauncher();
-                        Action<string> statusCallback = status => DebugLog($"[LAUNCH] {status}");
-                        _ = launcher.CheckAndLaunchInBackgroundAsync(config, statusCallback);
-
-                        DebugLog("[Main] 백그라운드 프로그램 시작 완료");
+                        // 파일이 있으면 정상 실행 (오류 발생 시 업데이트 요청)
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                var launcher = new ApplicationLauncher();
+                                Action<string> statusCallback = status => DebugLog($"[LAUNCH] {status}");
+                                await launcher.CheckAndLaunchInBackgroundAsync(config, statusCallback);
+                                DebugLog("[Main] 백그라운드 프로그램 시작 완료");
+                            }
+                            catch (Exception ex)
+                            {
+                                DebugLog($"[Main] 백그라운드 프로그램 시작 오류: {ex.Message}");
+                                DebugLog("[Main] 서버에 업데이트 요청...");
+                                await RequestUpdateCall();
+                            }
+                        });
                     }
                     else
                     {
                         DebugLog("[Main] 대상 파일이 존재하지 않음. 서버에 업데이트 요청...");
-                        // MQTT가 연결될 때까지 대기하거나 연결 후 요청 전송  
-                        _ = Task.Run(async () =>
-                        {
-                            var mqtt = ServiceContainer.MqttService;
-                            if (mqtt != null)
-                            {
-                                // MQTT 연결 시도  
-                                try
-                                {
-                                    await mqtt.ConnectAsync();
-                                }
-                                catch (Exception ex)
-                                {
-                                    DebugLog($"[Main] MQTT 연결 실패: {ex.Message}");
-                                }
-                                if (mqtt.IsConnected)
-                                {
-                                    RequestUpdateCall();
-                                }
-                            }
-                        });
+                        _ = RequestUpdateCall(); // Fire-and-forget (백그라운드에서 실행)
                     }
                 }
                 else
@@ -353,6 +344,10 @@ namespace AppLauncher
 
             // 정리
             DebugLog("[Main] 정리 중...");
+
+            // ServiceContainer 정리 (MQTT 연결 해제 등)
+            ServiceContainer.Dispose();
+
             _mutex?.ReleaseMutex();
             _mutex?.Dispose();
             DebugLog("[Main] 종료 완료");
@@ -425,7 +420,7 @@ namespace AppLauncher
         /// 서버에 LabVIEW 업데이트 요청 (파일 없을 때)
         /// MQTT 연결될 때까지 재시도
         /// </summary>
-        private static async void RequestUpdateCall()
+        private static async Task RequestUpdateCall()
         {
             var mqttService = ServiceContainer.MqttService;
             var handler = ServiceContainer.MqttMessageHandler;
@@ -436,9 +431,9 @@ namespace AppLauncher
                 return;
             }
 
-            // MQTT 연결될 때까지 재시도 (최대 5분)
+            // MQTT 연결될 때까지 재시도 (최대 3분)
             int retryCount = 0;
-            int maxRetries = 30; // 10초 * 30 = 5분
+            int maxRetries = 36; // 5초 * 36 = 180초 = 3분
 
             while (!mqttService.IsConnected && retryCount < maxRetries)
             {
@@ -461,8 +456,8 @@ namespace AppLauncher
                 retryCount++;
                 if (!mqttService.IsConnected && retryCount < maxRetries)
                 {
-                    DebugLog("[Main] 10초 후 재시도...");
-                    await Task.Delay(10000); // 10초 대기
+                    DebugLog("[Main] 5초 후 재시도...");
+                    await Task.Delay(5000); // 5초 대기
                 }
             }
 

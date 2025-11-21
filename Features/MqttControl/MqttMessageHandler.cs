@@ -57,12 +57,12 @@ namespace AppLauncher.Features.MqttControl
 
                     case "LABVIEW_UPDATE_IMMEDIATE":
                     case "LABVIEWUPDATEIMMEDIATE":
-                        UpdateLabView(command, true);
+                        _ = UpdateLabView(command, true);
                         break;
 
                     case "LABVIEW_UPDATE":
                     case "LABVIEWUPDATE":
-                        UpdateLabView(command, false);
+                        _ = UpdateLabView(command, false);
                         break;
 
                     case "LAUNCHER_UPDATE":
@@ -93,7 +93,7 @@ namespace AppLauncher.Features.MqttControl
         /// <summary>
         /// MQTT 명령으로 애플리케이션 실행
         /// </summary>
-        private async void UpdateLabView(LaunchCommand command, bool isDownloadImmediate)
+        private async Task UpdateLabView(LaunchCommand command, bool isDownloadImmediate)
         {
             try
             {
@@ -106,8 +106,7 @@ namespace AppLauncher.Features.MqttControl
                         SendStatusResponse
                      );
 
-
-                    LabViewUpdater.ScheduleUpdate(isDownloadImmediate);
+                    await LabViewUpdater.ScheduleUpdate(isDownloadImmediate);
                     return;
                 }
             }
