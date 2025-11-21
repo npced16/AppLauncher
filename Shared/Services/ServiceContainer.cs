@@ -14,26 +14,29 @@ namespace AppLauncher.Shared.Services
         public static MqttService? MqttService { get; private set; }
         public static MqttMessageHandler? MqttMessageHandler { get; private set; }
         public static LauncherConfig? Config { get; private set; }
-
+        private static readonly object _lock = new object();
         /// <summary>
         /// 모든 서비스 초기화
         /// </summary>
         public static void Initialize(LauncherConfig config)
         {
-            // 기존 서비스가 있으면 먼저 정리
-            Dispose();
+            lock (_lock)
+            {
+                // 기존 서비스가 있으면 먼저 정리
+                Dispose();
 
-            Config = config;
+                Config = config;
 
-            // MQTT 서비스 초기화
-            string clientId = HardwareInfo.GetHardwareUuid();
-            MqttService = new MqttService(config.MqttSettings, clientId);
+                // MQTT 서비스 초기화
+                string clientId = HardwareInfo.GetHardwareUuid();
+                MqttService = new MqttService(config.MqttSettings, clientId);
 
-            // MQTT 메시지 핸들러 초기화
-            MqttMessageHandler = new MqttMessageHandler(MqttService, config, null);
+                // MQTT 메시지 핸들러 초기화
+                MqttMessageHandler = new MqttMessageHandler(MqttService, config);
 
-            // MQTT 메시지 수신 이벤트 연결
-            MqttService.MessageReceived += (msg) => MqttMessageHandler?.HandleMessage(msg);
+                // MQTT 메시지 수신 이벤트 연결
+                MqttService.MessageReceived += (msg) => MqttMessageHandler?.HandleMessage(msg);
+            }
         }
 
         /// <summary>
@@ -50,8 +53,10 @@ namespace AppLauncher.Shared.Services
                     // 연결되어 있으면 끊기
                     if (mqttService.IsConnected)
                     {
-                        Task.Run(async () => await mqttService.DisconnectAsync())
-                            .Wait(TimeSpan.FromSeconds(3));
+                        mqttService.DisconnectAsync()
+                                          .ConfigureAwait(false)
+                                          .GetAwaiter()
+                                          .GetResult();
                     }
                 }
                 catch

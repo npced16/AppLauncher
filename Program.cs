@@ -176,8 +176,6 @@ namespace AppLauncher
 #else
             DebugLog("[Program] Debug 모드 - 자동 설치 스킵");
 #endif
-            // 업데이트가 없으면 백그라운드 프로그램 시작
-            DebugLog("[Main] 업데이트 없음. 백그라운드 프로그램 시작...");
             var config = ConfigManager.LoadConfig();
 
             // 서비스 컨테이너 초기화
@@ -312,7 +310,28 @@ namespace AppLauncher
                     else
                     {
                         DebugLog("[Main] 대상 파일이 존재하지 않음. 서버에 업데이트 요청...");
-                        RequestUpdateCall();
+                        // MQTT가 연결될 때까지 대기하거나 연결 후 요청 전송  
+                        _ = Task.Run(async () =>
+                        {
+                            var mqtt = ServiceContainer.MqttService;
+                            if (mqtt != null)
+                            {
+                                // MQTT 연결 시도  
+                                try
+                                {
+                                    await mqtt.ConnectAsync();
+                                }
+                                catch (Exception ex)
+                                {
+                                    DebugLog($"[Main] MQTT 연결 실패: {ex.Message}");
+                                }
+                                Z
+                                if (mqtt.IsConnected)
+                                {
+                                    RequestUpdateCall();
+                                }
+                            }
+                        });
                     }
                 }
                 else
@@ -405,17 +424,59 @@ namespace AppLauncher
 
         /// <summary>
         /// 서버에 LabVIEW 업데이트 요청 (파일 없을 때)
+        /// MQTT 연결될 때까지 재시도
         /// </summary>
-        private static void RequestUpdateCall()
+        private static async void RequestUpdateCall()
         {
+            var mqttService = ServiceContainer.MqttService;
             var handler = ServiceContainer.MqttMessageHandler;
-            if (handler == null)
+
+            if (mqttService == null || handler == null)
             {
-                DebugLog("[Main] MqttMessageHandler가 초기화되지 않아 업데이트 요청 불가");
+                DebugLog("[Main] MQTT 서비스가 초기화되지 않아 업데이트 요청 불가");
                 return;
             }
 
-            handler.RequestLabViewUpdate("file_not_found");
+            // MQTT 연결될 때까지 재시도 (최대 5분)
+            int retryCount = 0;
+            int maxRetries = 30; // 10초 * 30 = 5분
+
+            while (!mqttService.IsConnected && retryCount < maxRetries)
+            {
+                try
+                {
+                    DebugLog($"[Main] MQTT 연결 시도 중... ({retryCount + 1}/{maxRetries})");
+                    await mqttService.ConnectAsync();
+
+                    if (mqttService.IsConnected)
+                    {
+                        DebugLog("[Main] MQTT 연결 성공!");
+                        break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    DebugLog($"[Main] MQTT 연결 실패: {ex.Message}");
+                }
+
+                retryCount++;
+                if (!mqttService.IsConnected && retryCount < maxRetries)
+                {
+                    DebugLog("[Main] 10초 후 재시도...");
+                    await Task.Delay(10000); // 10초 대기
+                }
+            }
+
+            // 연결 성공 여부 확인
+            if (mqttService.IsConnected)
+            {
+                DebugLog("[Main] MQTT 연결 완료. 업데이트 요청 전송...");
+                handler.RequestLabViewUpdate("file_not_found");
+            }
+            else
+            {
+                DebugLog("[Main] MQTT 연결 실패. 업데이트 요청을 보낼 수 없습니다.");
+            }
         }
 
     }

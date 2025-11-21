@@ -50,16 +50,22 @@ namespace AppLauncher.Features.VersionManagement
                     Description = $"챔버 소프트웨어 {_command.Version} 업데이트"
                 };
 
-                bool saved = PendingUpdateManager.SavePendingUpdate(pendingUpdate);
-
-                if (!saved)
+                try
                 {
-                    Console.WriteLine("[SCHEDULE] Failed to save pending update");
-                    _sendStatusResponse?.Invoke("error", "업데이트 예약 저장 실패");
+                    bool saved = PendingUpdateManager.SavePendingUpdate(pendingUpdate);
+                    if (!saved)
+                    {
+                        Console.WriteLine("[SCHEDULE] Failed to save pending update");
+                        _sendStatusResponse?.Invoke("error", "업데이트 예약 저장 실패");
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[SCHEDULE] Exception saving pending update: {ex.Message}");
+                    _sendStatusResponse?.Invoke("error", $"업데이트 예약 저장 실패: {ex.Message}");
                     return;
                 }
-
-                Console.WriteLine("[SCHEDULE] Update scheduled successfully.");
 
                 // 즉시 실행 모드: 런처 재시작하여 UpdateProgressForm으로 업데이트 진행
                 if (isDownloadImmediate)

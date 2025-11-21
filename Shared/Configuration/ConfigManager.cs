@@ -23,24 +23,12 @@ namespace AppLauncher.Shared.Configuration
             return Path.Combine(appFolder, ConfigFileName);
         }
 
-        // 기존 설정이 있는지 확인 (이전 버전 호환성)
-        private static string GetLegacyConfigPath()
-        {
-            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ConfigFileName);
-        }
 
         public static LauncherConfig LoadConfig()
         {
             try
             {
                 string appDataConfigPath = GetAppDataConfigPath();
-                string legacyConfigPath = GetLegacyConfigPath();
-
-                // AppData에 설정이 없고 기존 위치에 있으면 마이그레이션
-                if (!File.Exists(appDataConfigPath) && File.Exists(legacyConfigPath))
-                {
-                    File.Copy(legacyConfigPath, appDataConfigPath, true);
-                }
 
                 if (!File.Exists(appDataConfigPath))
                 {

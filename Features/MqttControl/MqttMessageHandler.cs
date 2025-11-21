@@ -19,17 +19,14 @@ namespace AppLauncher.Features.MqttControl
     {
         private readonly MqttService _mqttService;
         private readonly LauncherConfig _config;
-        private Action<string, string, int>? _showBalloonTipCallback;
 
         public MqttMessageHandler(
             MqttService mqttService,
             LauncherConfig config,
-            Action<string, string, int>? showBalloonTipCallback = null
             )
         {
             _mqttService = mqttService ?? throw new ArgumentNullException(nameof(mqttService));
             _config = config ?? throw new ArgumentNullException(nameof(config));
-            _showBalloonTipCallback = showBalloonTipCallback;
         }
 
         /// <summary>
@@ -37,7 +34,6 @@ namespace AppLauncher.Features.MqttControl
         /// </summary>
         public void SetBalloonTipCallback(Action<string, string, int> callback)
         {
-            _showBalloonTipCallback = callback;
         }
 
         /// <summary>
@@ -305,12 +301,12 @@ namespace AppLauncher.Features.MqttControl
 
                 if (updatedPath != null)
                 {
-                    // 토스트 알림 표시 (5초 동안)
-                    _showBalloonTipCallback?.Invoke(
-                        "런처 업데이트 완료",
-                        "업데이트가 완료되었습니다.\n컴퓨터를 재시작하면 새 버전이 적용됩니다.",
-                        5000
-                    );
+                    // // 토스트 알림 표시 (5초 동안)
+                    // _showBalloonTipCallback?.Invoke(
+                    //     "런처 업데이트 완료",
+                    //     "업데이트가 완료되었습니다.\n컴퓨터를 재시작하면 새 버전이 적용됩니다.",
+                    //     5000
+                    // );
                 }
             }
             catch (Exception)

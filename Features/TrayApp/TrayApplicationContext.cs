@@ -133,7 +133,6 @@ namespace AppLauncher.Features.TrayApp
             }
             catch (Exception ex)
             {
-                _notifyIcon?.ShowBalloonTip(3000, "오류", ex.Message, ToolTipIcon.Error);
             }
         }
 
@@ -195,18 +194,9 @@ namespace AppLauncher.Features.TrayApp
             }
         }
 
-        private void OnMqttLogMessage(string message)
-        {
-            System.Diagnostics.Debug.WriteLine($"[MQTT] {message}");
-        }
 
-        private void ShowBalloonTip(string title, string message, int timeout)
-        {
-            if (_notifyIcon != null)
-            {
-                _notifyIcon.ShowBalloonTip(timeout, title, message, ToolTipIcon.Info);
-            }
-        }
+
+
 
         private void ShowMainForm(object? sender, EventArgs e)
         {
@@ -283,7 +273,7 @@ namespace AppLauncher.Features.TrayApp
                 }
 
                 // MQTT 연결 해제
-                if (ServiceContainer.MqttService.IsConnected)
+                if (ServiceContainer.MqttService != null && ServiceContainer.MqttService.IsConnected)
                 {
                     await ServiceContainer.MqttService.DisconnectAsync();
                     await Task.Delay(500); // MQTT 연결 해제 대기
