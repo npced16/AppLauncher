@@ -80,6 +80,16 @@ namespace AppLauncher.Features.MqttControl
                         ChangeLocation(command);
                         break;
 
+                    case "SETTINGS_UPDATE":
+                    case "SETTINGSUPDATE":
+                        UpdateSettingsFile(command);
+                        break;
+
+                    case "SETTINGS_GET":
+                    case "SETTINGSGET":
+                        GetSettingsFile();
+                        break;
+
                     default:
                         break;
                 }
@@ -249,6 +259,109 @@ namespace AppLauncher.Features.MqttControl
             }
             catch (Exception ex)
             {
+                SendStatusResponse("error", ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// setting.ini 파일 경로 가져오기
+        /// </summary>
+        private string GetSettingsFilePath()
+        {
+            string documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            return Path.Combine(documents, "HBOT", "Setting", "setting.ini");
+        }
+
+        /// <summary>
+        /// setting.ini 파일 덮어쓰기
+        /// </summary>
+        private async void UpdateSettingsFile(LaunchCommand command)
+        {
+            try
+            {
+                Console.WriteLine("[MQTT] SETTINGS_UPDATE 명령 수신");
+
+                // settingContent 확인
+                if (string.IsNullOrEmpty(command.SettingContent))
+                {
+                    Console.WriteLine("[MQTT] SettingContent가 비어있음");
+                    SendStatusResponse("error", "settingContent is empty");
+                    return;
+                }
+
+                string filePath = GetSettingsFilePath();
+
+                Console.WriteLine($"[MQTT] 파일 경로: {filePath}");
+                Console.WriteLine($"[MQTT] SettingContent 길이: {command.SettingContent.Length}");
+
+                // 디렉토리 확인
+                string? directory = Path.GetDirectoryName(filePath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Console.WriteLine($"[MQTT] 디렉토리 생성: {directory}");
+                    Directory.CreateDirectory(directory);
+                }
+
+                // 파일 쓰기
+                File.WriteAllText(filePath, command.SettingContent);
+                Console.WriteLine($"[MQTT] setting.ini 업데이트 완료: {filePath}");
+
+                // 저장된 내용 다시 읽어서 확인용으로 전송
+                string savedContent = File.ReadAllText(filePath);
+                Console.WriteLine($"[MQTT] 저장된 파일 다시 읽기 완료. 길이: {savedContent.Length}");
+
+                var response = new
+                {
+                    status = "settings_updated",
+                    settingContent = savedContent,
+                    timestamp = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss")
+                };
+
+                await _mqttService.PublishJsonAsync(_mqttService.StatusTopic, response);
+                Console.WriteLine("[MQTT] 저장된 setting.ini 내용 전송 완료");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MQTT] setting.ini 업데이트 오류: {ex.Message}");
+                SendStatusResponse("error", ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// setting.ini 파일 내용 읽어서 전송
+        /// </summary>
+        private async void GetSettingsFile()
+        {
+            try
+            {
+                Console.WriteLine("[MQTT] SETTINGS_GET 명령 수신");
+
+                string filePath = GetSettingsFilePath();
+                Console.WriteLine($"[MQTT] 파일 경로: {filePath}");
+
+                if (!File.Exists(filePath))
+                {
+                    Console.WriteLine("[MQTT] setting.ini 파일이 존재하지 않음");
+                    SendStatusResponse("error", $"File not found: {filePath}");
+                    return;
+                }
+
+                string content = File.ReadAllText(filePath);
+                Console.WriteLine($"[MQTT] setting.ini 읽기 완료. 길이: {content.Length}");
+
+                var response = new
+                {
+                    status = "settings_content",
+                    settingContent = content,
+                    timestamp = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss")
+                };
+
+                await _mqttService.PublishJsonAsync(_mqttService.StatusTopic, response);
+                Console.WriteLine("[MQTT] setting.ini 내용 전송 완료");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MQTT] setting.ini 읽기 오류: {ex.Message}");
                 SendStatusResponse("error", ex.Message);
             }
         }
