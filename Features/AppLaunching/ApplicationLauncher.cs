@@ -3,12 +3,14 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using AppLauncher.Shared;
 using AppLauncher.Shared.Configuration;
 
 namespace AppLauncher.Features.AppLaunching
 {
     public class ApplicationLauncher
     {
+
         private ManagedProcess? _managedProcess = null;
         private readonly object _lock = new object();
         private IntPtr _jobHandle = IntPtr.Zero;
@@ -76,7 +78,7 @@ namespace AppLauncher.Features.AppLaunching
             _jobHandle = CreateJobObject(IntPtr.Zero, null);
             if (_jobHandle == IntPtr.Zero)
             {
-                Console.WriteLine("[ApplicationLauncher] Job Object 생성 실패");
+                DebugLogger.Log("[ApplicationLauncher] Job Object 생성 실패");
                 return;
             }
 
@@ -100,11 +102,11 @@ namespace AppLauncher.Features.AppLaunching
 
             if (result)
             {
-                Console.WriteLine("[ApplicationLauncher] Job Object 설정 완료 (부모 종료 시 자식도 자동 종료)");
+                DebugLogger.Log("[ApplicationLauncher] Job Object 설정 완료 (부모 종료 시 자식도 자동 종료)");
             }
             else
             {
-                Console.WriteLine("[ApplicationLauncher] Job Object 설정 실패");
+                DebugLogger.Log("[ApplicationLauncher] Job Object 설정 실패");
             }
         }
 
@@ -194,12 +196,12 @@ namespace AppLauncher.Features.AppLaunching
                         bool assigned = AssignProcessToJobObject(_jobHandle, process.Handle);
                         if (assigned)
                         {
-                            Console.WriteLine($"[ApplicationLauncher] 프로세스를 Job Object에 할당 완료 (PID: {process.Id})");
-                            Console.WriteLine("[ApplicationLauncher] AppLauncher 종료 시 자동으로 함께 종료됩니다");
+                            DebugLogger.Log($"[ApplicationLauncher] 프로세스를 Job Object에 할당 완료 (PID: {process.Id})");
+                            DebugLogger.Log("[ApplicationLauncher] AppLauncher 종료 시 자동으로 함께 종료됩니다");
                         }
                         else
                         {
-                            Console.WriteLine($"[ApplicationLauncher] Job Object 할당 실패 (PID: {process.Id})");
+                            DebugLogger.Log($"[ApplicationLauncher] Job Object 할당 실패 (PID: {process.Id})");
                         }
                     }
 
@@ -358,7 +360,7 @@ namespace AppLauncher.Features.AppLaunching
                 // Job Object를 닫으면 자동으로 자식 프로세스도 종료됨
                 if (_jobHandle != IntPtr.Zero)
                 {
-                    Console.WriteLine("[ApplicationLauncher] Job Object 종료 (모든 자식 프로세스 자동 종료)");
+                    DebugLogger.Log("[ApplicationLauncher] Job Object 종료 (모든 자식 프로세스 자동 종료)");
                     CloseHandle(_jobHandle);
                     _jobHandle = IntPtr.Zero;
                 }
@@ -367,20 +369,20 @@ namespace AppLauncher.Features.AppLaunching
                 {
                     try
                     {
-                        Console.WriteLine($"[ApplicationLauncher] 프로세스 종료 시도: {_managedProcess.Name} (PID: {_managedProcess.ProcessId})");
+                        DebugLogger.Log($"[ApplicationLauncher] 프로세스 종료 시도: {_managedProcess.Name} (PID: {_managedProcess.ProcessId})");
                         _managedProcess.Process.Kill();
                         _managedProcess.Process.WaitForExit(3000); // 3초 대기
-                        Console.WriteLine($"[ApplicationLauncher] 프로세스 종료 완료");
+                        DebugLogger.Log($"[ApplicationLauncher] 프로세스 종료 완료");
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[ApplicationLauncher] 프로세스 종료 실패: {ex.Message}");
+                        DebugLogger.Log($"[ApplicationLauncher] 프로세스 종료 실패: {ex.Message}");
                     }
                     _managedProcess = null;
                 }
                 else
                 {
-                    Console.WriteLine("[ApplicationLauncher] _managedProcess가 null이거나 실행 중이지 않음");
+                    DebugLogger.Log("[ApplicationLauncher] _managedProcess가 null이거나 실행 중이지 않음");
                 }
             }
         }
@@ -396,29 +398,29 @@ namespace AppLauncher.Features.AppLaunching
                     return;
 
                 string processName = Path.GetFileNameWithoutExtension(executablePath);
-                Console.WriteLine($"[ApplicationLauncher] 프로세스 이름으로 종료 시도: {processName}");
+                DebugLogger.Log($"[ApplicationLauncher] 프로세스 이름으로 종료 시도: {processName}");
 
                 var processes = Process.GetProcessesByName(processName);
-                Console.WriteLine($"[ApplicationLauncher] 발견된 프로세스 수: {processes.Length}");
+                DebugLogger.Log($"[ApplicationLauncher] 발견된 프로세스 수: {processes.Length}");
 
                 foreach (var process in processes)
                 {
                     try
                     {
-                        Console.WriteLine($"[ApplicationLauncher] 프로세스 종료: {process.ProcessName} (PID: {process.Id})");
+                        DebugLogger.Log($"[ApplicationLauncher] 프로세스 종료: {process.ProcessName} (PID: {process.Id})");
                         process.Kill();
                         process.WaitForExit(3000);
-                        Console.WriteLine($"[ApplicationLauncher] 프로세스 종료 완료: PID {process.Id}");
+                        DebugLogger.Log($"[ApplicationLauncher] 프로세스 종료 완료: PID {process.Id}");
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[ApplicationLauncher] 프로세스 종료 실패 (PID {process.Id}): {ex.Message}");
+                        DebugLogger.Log($"[ApplicationLauncher] 프로세스 종료 실패 (PID {process.Id}): {ex.Message}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ApplicationLauncher] CleanupByProcessName 오류: {ex.Message}");
+                DebugLogger.Log($"[ApplicationLauncher] CleanupByProcessName 오류: {ex.Message}");
             }
         }
     }

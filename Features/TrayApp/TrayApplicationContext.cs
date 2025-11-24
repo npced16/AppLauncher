@@ -23,16 +23,9 @@ namespace AppLauncher.Features.TrayApp
         private MqttMessageHandler _mqttMessageHandler => ServiceContainer.MqttMessageHandler!;
         private LauncherConfig? _config;
 
-        private static void DebugLog(string message)
-        {
-#if DEBUG
-            Console.WriteLine(message);
-#endif
-        }
-
         public TrayApplicationContext()
         {
-            DebugLog("[TrayApplicationContext] InitializeTrayIcon 호출");
+            DebugLogger.Log("[TrayApplicationContext] InitializeTrayIcon 호출");
             InitializeTrayIcon();
         }
 
@@ -156,7 +149,7 @@ namespace AppLauncher.Features.TrayApp
                 }
 
                 // 앱 실행
-                Action<string> statusCallback = status => DebugLog($"[LAUNCH] {status}");
+                Action<string> statusCallback = status => DebugLogger.Log($"[LAUNCH] {status}");
                 await launcher.CheckAndLaunchInBackgroundAsync(config, statusCallback);
 
                 MessageBox.Show(

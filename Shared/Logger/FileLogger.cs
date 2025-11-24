@@ -11,6 +11,7 @@ namespace AppLauncher.Shared.Logger
     /// </summary>
     public class FileLogger : IDisposable
     {
+        private static void Log(string message) => DebugLogger.Log(message);
         private readonly string _logDirectory;
         private readonly int _retentionDays;
         private readonly SemaphoreSlim _writeLock = new SemaphoreSlim(1, 1);
@@ -52,7 +53,7 @@ namespace AppLauncher.Shared.Logger
             catch (Exception ex)
             {
                 // 로그 기록 실패 시 콘솔에 출력 (무한 루프 방지)
-                Console.WriteLine($"[FileLogger Error] {ex.Message}");
+                Log($"[FileLogger Error] {ex.Message}");
             }
             finally
             {
@@ -99,18 +100,18 @@ namespace AppLauncher.Shared.Logger
                         if (fileInfo.LastWriteTime < cutoffDate)
                         {
                             File.Delete(file);
-                            Console.WriteLine($"[FileLogger] Deleted old log file: {fileInfo.Name}");
+                            Log($"[FileLogger] Deleted old log file: {fileInfo.Name}");
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[FileLogger] Failed to delete {file}: {ex.Message}");
+                        Log($"[FileLogger] Failed to delete {file}: {ex.Message}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[FileLogger] Cleanup error: {ex.Message}");
+                Log($"[FileLogger] Cleanup error: {ex.Message}");
             }
         }
 

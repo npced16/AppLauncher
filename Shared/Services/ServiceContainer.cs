@@ -9,10 +9,11 @@ using AppLauncher.Shared.Configuration;
 namespace AppLauncher.Shared.Services
 {
     /// <summary>
-    /// 전역 서비스 컨테이너 (Pinia/Riverpod 스타일)
+    /// 전역 서비스 컨테이너
     /// </summary>
     public static class ServiceContainer
     {
+
         public static MqttService? MqttService { get; private set; }
         public static MqttMessageHandler? MqttMessageHandler { get; private set; }
         public static LauncherConfig? Config { get; private set; }
@@ -55,7 +56,7 @@ namespace AppLauncher.Shared.Services
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[ServiceContainer] MQTT 초기 연결 실패: {ex.Message}");
+                        DebugLogger.Log($"[ServiceContainer] MQTT 초기 연결 실패: {ex.Message}");
                         // 자동 재연결 로직이 작동하므로 예외 무시
                     }
                 });
@@ -77,7 +78,7 @@ namespace AppLauncher.Shared.Services
                     _statusTimer.AutoReset = true;
                 }
                 _statusTimer.Start();
-                Console.WriteLine("[ServiceContainer] 상태 전송 타이머 시작 (1분 간격)");
+                DebugLogger.Log("[ServiceContainer] 상태 전송 타이머 시작 (1분 간격)");
 
                 // 즉시 한번 전송
                 MqttMessageHandler?.SendStatus("connected");
@@ -86,7 +87,7 @@ namespace AppLauncher.Shared.Services
             {
                 // 연결 끊기면 타이머 정지
                 _statusTimer?.Stop();
-                Console.WriteLine("[ServiceContainer] 상태 전송 타이머 정지");
+                DebugLogger.Log("[ServiceContainer] 상태 전송 타이머 정지");
             }
         }
 
@@ -101,7 +102,7 @@ namespace AppLauncher.Shared.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ServiceContainer] 상태 전송 오류: {ex.Message}");
+                DebugLogger.Log($"[ServiceContainer] 상태 전송 오류: {ex.Message}");
             }
         }
 
@@ -115,21 +116,21 @@ namespace AppLauncher.Shared.Services
             {
                 try
                 {
-                    Console.WriteLine("[ServiceContainer] ApplicationLauncher 정리 중...");
+                    DebugLogger.Log("[ServiceContainer] ApplicationLauncher 정리 중...");
                     AppLauncher.Cleanup();
 
                     // 혹시 _managedProcess가 null인 경우를 대비해 프로세스 이름으로도 종료 시도
                     if (Config != null && !string.IsNullOrEmpty(Config.TargetExecutable))
                     {
-                        Console.WriteLine($"[ServiceContainer] 프로세스 이름으로 추가 종료 시도: {Config.TargetExecutable}");
+                        DebugLogger.Log($"[ServiceContainer] 프로세스 이름으로 추가 종료 시도: {Config.TargetExecutable}");
                         AppLauncher.CleanupByProcessName(Config.TargetExecutable);
                     }
 
-                    Console.WriteLine("[ServiceContainer] ApplicationLauncher 정리 완료");
+                    DebugLogger.Log("[ServiceContainer] ApplicationLauncher 정리 완료");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[ServiceContainer] ApplicationLauncher 정리 오류: {ex.Message}");
+                    DebugLogger.Log($"[ServiceContainer] ApplicationLauncher 정리 오류: {ex.Message}");
                 }
                 AppLauncher = null;
             }

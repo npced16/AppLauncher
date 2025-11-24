@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using AppLauncher.Features.MqttControl;
 using AppLauncher.Features.VersionManagement;
+using AppLauncher.Shared;
 using AppLauncher.Shared.Configuration;
 
 namespace AppLauncher.Presentation.WinForms
@@ -13,6 +14,7 @@ namespace AppLauncher.Presentation.WinForms
     /// </summary>
     public class UpdateProgressForm : Form
     {
+
         private Label titleLabel = null!;
         private Label statusLabel = null!;
         private ProgressBar progressBar = null!;
@@ -211,7 +213,7 @@ namespace AppLauncher.Presentation.WinForms
                 _updateSuccess = false;
                 UpdateStatus($"업데이트 오류: {ex.Message}");
                 statusLabel.ForeColor = Color.Red;
-                Console.WriteLine($"[UPDATE_ERROR] {ex.Message}");
+                Log($"[UPDATE_ERROR] {ex.Message}");
 
                 await Task.Delay(2000);
             }
@@ -259,7 +261,7 @@ namespace AppLauncher.Presentation.WinForms
                 UpdateStatus("런처를 재시작합니다...");
                 statusLabel.ForeColor = Color.LightBlue;
 
-                Console.WriteLine("[UPDATE] Restarting launcher after update failure");
+                Log("[UPDATE] Restarting launcher after update failure");
 
                 await Task.Delay(2000);
                 if (InvokeRequired)
@@ -280,7 +282,7 @@ namespace AppLauncher.Presentation.WinForms
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[UPDATE] Failed to restart launcher: {ex.Message}");
+                Log($"[UPDATE] Failed to restart launcher: {ex.Message}");
 
                 this.Close();
             }
@@ -296,7 +298,7 @@ namespace AppLauncher.Presentation.WinForms
                 UpdateStatus("컴퓨터를 재시작합니다...");
                 statusLabel.ForeColor = Color.LightBlue;
 
-                Console.WriteLine("[UPDATE] Restarting computer...");
+                Log("[UPDATE] Restarting computer...");
 
                 // shutdown 명령어로 컴퓨터 재시작 (10초 후)
                 var startInfo = new System.Diagnostics.ProcessStartInfo
@@ -324,7 +326,7 @@ namespace AppLauncher.Presentation.WinForms
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[UPDATE] Failed to restart computer: {ex.Message}");
+                Log($"[UPDATE] Failed to restart computer: {ex.Message}");
 
                 // 재시작 실패 시 그냥 폼만 닫기
                 this.Close();
@@ -387,7 +389,7 @@ namespace AppLauncher.Presentation.WinForms
                     break;
 
                 default:
-                    Console.WriteLine($"[UPDATE] Unknown status: {status}");
+                    Log($"[UPDATE] Unknown status: {status}");
                     break;
             }
         }

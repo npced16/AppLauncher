@@ -17,6 +17,7 @@ namespace AppLauncher.Features.MqttControl
     /// </summary>
     public class MqttMessageHandler
     {
+
         private readonly MqttService _mqttService;
         private readonly LauncherConfig _config;
 
@@ -207,11 +208,11 @@ namespace AppLauncher.Features.MqttControl
 
                 await _mqttService.PublishJsonAsync(_mqttService.StatusTopic, status);
 
-                Console.WriteLine($"[MQTT] Status sent ({statusMessage}) - Launcher: {launcherVersion}, App: {targetAppVersion}");
+                DebugLogger.Log($"[MQTT] Status sent ({statusMessage}) - Launcher: {launcherVersion}, App: {targetAppVersion}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[MQTT] Status send error: {ex.Message}");
+                DebugLogger.Log($"[MQTT] Status send error: {ex.Message}");
             }
         }
 
@@ -279,36 +280,36 @@ namespace AppLauncher.Features.MqttControl
         {
             try
             {
-                Console.WriteLine("[MQTT] SETTINGS_UPDATE 명령 수신");
+                DebugLogger.Log("[MQTT] SETTINGS_UPDATE 명령 수신");
 
                 // settingContent 확인
                 if (string.IsNullOrEmpty(command.SettingContent))
                 {
-                    Console.WriteLine("[MQTT] SettingContent가 비어있음");
+                    DebugLogger.Log("[MQTT] SettingContent가 비어있음");
                     SendStatusResponse("error", "settingContent is empty");
                     return;
                 }
 
                 string filePath = GetSettingsFilePath();
 
-                Console.WriteLine($"[MQTT] 파일 경로: {filePath}");
-                Console.WriteLine($"[MQTT] SettingContent 길이: {command.SettingContent.Length}");
+                DebugLogger.Log($"[MQTT] 파일 경로: {filePath}");
+                DebugLogger.Log($"[MQTT] SettingContent 길이: {command.SettingContent.Length}");
 
                 // 디렉토리 확인
                 string? directory = Path.GetDirectoryName(filePath);
                 if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
                 {
-                    Console.WriteLine($"[MQTT] 디렉토리 생성: {directory}");
+                    DebugLogger.Log($"[MQTT] 디렉토리 생성: {directory}");
                     Directory.CreateDirectory(directory);
                 }
 
                 // 파일 쓰기
                 File.WriteAllText(filePath, command.SettingContent);
-                Console.WriteLine($"[MQTT] setting.ini 업데이트 완료: {filePath}");
+                DebugLogger.Log($"[MQTT] setting.ini 업데이트 완료: {filePath}");
 
                 // 저장된 내용 다시 읽어서 확인용으로 전송
                 string savedContent = File.ReadAllText(filePath);
-                Console.WriteLine($"[MQTT] 저장된 파일 다시 읽기 완료. 길이: {savedContent.Length}");
+                DebugLogger.Log($"[MQTT] 저장된 파일 다시 읽기 완료. 길이: {savedContent.Length}");
 
                 var response = new
                 {
@@ -318,11 +319,11 @@ namespace AppLauncher.Features.MqttControl
                 };
 
                 await _mqttService.PublishJsonAsync(_mqttService.StatusTopic, response);
-                Console.WriteLine("[MQTT] 저장된 setting.ini 내용 전송 완료");
+                DebugLogger.Log("[MQTT] 저장된 setting.ini 내용 전송 완료");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[MQTT] setting.ini 업데이트 오류: {ex.Message}");
+                DebugLogger.Log($"[MQTT] setting.ini 업데이트 오류: {ex.Message}");
                 SendStatusResponse("error", ex.Message);
             }
         }
@@ -334,20 +335,20 @@ namespace AppLauncher.Features.MqttControl
         {
             try
             {
-                Console.WriteLine("[MQTT] SETTINGS_GET 명령 수신");
+                DebugLogger.Log("[MQTT] SETTINGS_GET 명령 수신");
 
                 string filePath = GetSettingsFilePath();
-                Console.WriteLine($"[MQTT] 파일 경로: {filePath}");
+                DebugLogger.Log($"[MQTT] 파일 경로: {filePath}");
 
                 if (!File.Exists(filePath))
                 {
-                    Console.WriteLine("[MQTT] setting.ini 파일이 존재하지 않음");
+                    DebugLogger.Log("[MQTT] setting.ini 파일이 존재하지 않음");
                     SendStatusResponse("error", $"File not found: {filePath}");
                     return;
                 }
 
                 string content = File.ReadAllText(filePath);
-                Console.WriteLine($"[MQTT] setting.ini 읽기 완료. 길이: {content.Length}");
+                DebugLogger.Log($"[MQTT] setting.ini 읽기 완료. 길이: {content.Length}");
 
                 var response = new
                 {
@@ -357,11 +358,11 @@ namespace AppLauncher.Features.MqttControl
                 };
 
                 await _mqttService.PublishJsonAsync(_mqttService.StatusTopic, response);
-                Console.WriteLine("[MQTT] setting.ini 내용 전송 완료");
+                DebugLogger.Log("[MQTT] setting.ini 내용 전송 완료");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[MQTT] setting.ini 읽기 오류: {ex.Message}");
+                DebugLogger.Log($"[MQTT] setting.ini 읽기 오류: {ex.Message}");
                 SendStatusResponse("error", ex.Message);
             }
         }
@@ -493,7 +494,7 @@ namespace AppLauncher.Features.MqttControl
             {
                 if (_mqttService == null || !_mqttService.IsConnected)
                 {
-                    Console.WriteLine("[MQTT] Cannot request update - MQTT not connected");
+                    DebugLogger.Log("[MQTT] Cannot request update - MQTT not connected");
                     return;
                 }
 
@@ -522,11 +523,11 @@ namespace AppLauncher.Features.MqttControl
                 };
                 await _mqttService.PublishJsonAsync(_mqttService.StatusTopic, status);
 
-                Console.WriteLine($"[MQTT] Update request sent - Reason: {reason}");
+                DebugLogger.Log($"[MQTT] Update request sent - Reason: {reason}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[MQTT] Failed to request update: {ex.Message}");
+                DebugLogger.Log($"[MQTT] Failed to request update: {ex.Message}");
             }
         }
 

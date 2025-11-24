@@ -5,6 +5,8 @@ namespace AppLauncher.Shared
 {
   public class TaskSchedulerManager
   {
+    private static void Log(string message) => DebugLogger.Log(message);
+
     private const string TASK_NAME = "AppLauncher_Startup";
 
     /// <summary>
@@ -46,7 +48,7 @@ namespace AppLauncher.Shared
         string programFilesPath = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
         string targetExePath = System.IO.Path.Combine(programFilesPath, "AppLauncher", "AppLauncher.exe");
 
-        Console.WriteLine($"[TaskScheduler] 작업 스케줄러 등록 경로: {targetExePath}");
+        Log($"[TaskScheduler] 작업 스케줄러 등록 경로: {targetExePath}");
 
         // XML 형식으로 작업 생성
         string xmlTask = $@"<?xml version=""1.0"" encoding=""UTF-16""?>
