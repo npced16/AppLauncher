@@ -188,11 +188,6 @@ namespace AppLauncher.Features.AppLaunching
                 var process = Process.Start(startInfo);
                 if (process != null)
                 {
-                    if (process == null)
-                    {
-                        statusCallback("프로세스 시작 실패");
-                        return false;
-                    }
                     // Job Object에 프로세스 할당 (부모-자식 관계 설정)
                     if (_jobHandle != IntPtr.Zero)
                     {
@@ -224,7 +219,7 @@ namespace AppLauncher.Features.AppLaunching
                     statusCallback($"프로세스 시작: {processName} (PID: {process.Id})");
                 }
 
-                return true;
+                return process != null;
             }
             catch (Exception ex)
             {
