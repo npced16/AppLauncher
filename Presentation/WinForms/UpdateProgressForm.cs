@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using AppLauncher.Features.MqttControl;
 using AppLauncher.Features.VersionManagement;
 using AppLauncher.Shared.Configuration;
 
@@ -16,16 +17,16 @@ namespace AppLauncher.Presentation.WinForms
         private Label statusLabel = null!;
         private ProgressBar progressBar = null!;
         private Label detailLabel = null!;
-        private PendingUpdate _pendingUpdate = null!;
+        private LaunchCommand _command = null!;
         private LauncherConfig _config = null!;
         private bool _updateCompleted = false;
         private bool _updateSuccess = false;
         private Timer? _progressTimer;
         private int _targetProgress = 0;
 
-        public UpdateProgressForm(PendingUpdate pendingUpdate, LauncherConfig config)
+        public UpdateProgressForm(LaunchCommand command, LauncherConfig config)
         {
-            _pendingUpdate = pendingUpdate;
+            _command = command;
             _config = config;
             InitializeComponent();
             InitializeProgressAnimation();
@@ -175,7 +176,7 @@ namespace AppLauncher.Presentation.WinForms
 
                 // LabViewUpdater 생성
                 var updater = new LabViewUpdater(
-                    _pendingUpdate.Command,
+                    _command,
                     _config,
                     sendStatusResponse
                 );
@@ -333,7 +334,7 @@ namespace AppLauncher.Presentation.WinForms
         private void UpdateStatus(string status)
         {
             statusLabel.Text = status;
-            detailLabel.Text = $"업데이트 정보:\n버전: {_pendingUpdate.Command.Version}\n시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+            detailLabel.Text = $"업데이트 정보:\n버전: {_command.Version}\n시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
         }
 
         private void UpdateInstallStatus(string status)

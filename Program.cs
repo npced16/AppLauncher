@@ -267,11 +267,11 @@ namespace AppLauncher
 
             try
             {
-                var pendingUpdate = PendingUpdateManager.LoadPendingUpdate();
-                if (pendingUpdate != null)
+                var command = PendingUpdateManager.LoadPendingUpdate();
+                if (command != null)
                 {
                     var config = ConfigManager.LoadConfig();
-                    using (var updateForm = new UpdateProgressForm(pendingUpdate, config))
+                    using (var updateForm = new UpdateProgressForm(command, config))
                     {
                         DebugLog("[Main] UpdateProgressForm 실행...");
                         Application.Run(updateForm);

@@ -42,17 +42,10 @@ namespace AppLauncher.Features.VersionManagement
             {
                 Console.WriteLine("[SCHEDULE] Scheduling update for next launcher restart");
 
-                // 업데이트 정보를 JSON에 저장
-                var pendingUpdate = new PendingUpdate
-                {
-                    Command = _command,
-                    ScheduledTime = DateTime.Now,
-                    Description = $"챔버 소프트웨어 {_command.Version} 업데이트"
-                };
-
+                // 업데이트 정보를 JSON에 저장 (LaunchCommand 직접 저장)
                 try
                 {
-                    bool saved = PendingUpdateManager.SavePendingUpdate(pendingUpdate);
+                    bool saved = PendingUpdateManager.SavePendingUpdate(_command);
                     if (!saved)
                     {
                         Console.WriteLine("[SCHEDULE] Failed to save pending update");
