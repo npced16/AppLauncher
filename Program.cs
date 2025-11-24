@@ -51,7 +51,6 @@ namespace AppLauncher
                         {
                             File.Delete(oldFilePath);
                             DebugLog($"[CLEANUP] 구버전 파일 삭제 완료");
-                            Console.WriteLine($"[CLEANUP] Old version file deleted: {oldFilePath}");
                             break;
                         }
                         catch
@@ -160,13 +159,8 @@ namespace AppLauncher
         [STAThread]
         static void Main()
         {
-#if DEBUG
-            Console.WriteLine("=== AppLauncher 시작 ===");
-#endif
-            // HBOT Operator 언인스톨 테스트
-            // var uninstallString = UninstallSWService.FindUninstallString("HBOT Operator");
-            // DebugLog($"[Uninstall] HBOT Operator UninstallString: {uninstallString ?? "없음"}");
 
+            DebugLog("=== AppLauncher 시작 ===");
 
             // 구버전 파일 삭제
             CleanupOldVersion();

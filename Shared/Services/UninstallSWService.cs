@@ -151,20 +151,35 @@ namespace AppLauncher.Shared.Services
             Log($"실행: {startInfo.FileName} {startInfo.Arguments}");
             Log("프로세스 시작 중...");
 
-            var process = Process.Start(startInfo);
+            // var process = Process.Start(startInfo);
+            // if (process == null)
+            // {
+            //     Log("프로세스 시작 실패! (process == null)");
+            //     return false;
+            // }
+
+            // Log($"프로세스 시작됨. PID: {process.Id}");
+            // Log("프로세스 완료 대기 중...");
+
+            // process.WaitForExit();
+
+            // Log($"프로세스 종료. ExitCode: {process.ExitCode}");
+            using var process = Process.Start(startInfo);
             if (process == null)
             {
                 Log("프로세스 시작 실패! (process == null)");
                 return false;
             }
-
             Log($"프로세스 시작됨. PID: {process.Id}");
             Log("프로세스 완료 대기 중...");
-
-            process.WaitForExit();
-
+            // 30분 타임아웃 설정
+            if (!process.WaitForExit(30 * 60 * 1000))
+            {
+                Log("타임아웃: 프로세스가 30분 내에 완료되지 않음");
+                process.Kill();
+                return false;
+            }
             Log($"프로세스 종료. ExitCode: {process.ExitCode}");
-
             if (process.ExitCode == 0)
             {
                 Log("성공!");
@@ -220,7 +235,18 @@ namespace AppLauncher.Shared.Services
             Log($"실행: \"{startInfo.FileName}\" {startInfo.Arguments}");
             Log("프로세스 시작 중...");
 
-            var process = Process.Start(startInfo);
+            // var process = Process.Start(startInfo);
+            // if (process == null)
+            // {
+            //     Log("프로세스 시작 실패! (process == null)");
+            //     return false;
+            // }
+
+            // Log($"프로세스 시작됨. PID: {process.Id}");
+            // Log("프로세스 완료 대기 중...");
+
+            // process.WaitForExit();
+            using var process = Process.Start(startInfo);
             if (process == null)
             {
                 Log("프로세스 시작 실패! (process == null)");
@@ -230,7 +256,13 @@ namespace AppLauncher.Shared.Services
             Log($"프로세스 시작됨. PID: {process.Id}");
             Log("프로세스 완료 대기 중...");
 
-            process.WaitForExit();
+            // 30분 타임아웃 설정
+            if (!process.WaitForExit(30 * 60 * 1000))
+            {
+                Log("타임아웃: 프로세스가 30분 내에 완료되지 않음");
+                process.Kill();
+                return false;
+            }
 
             Log($"프로세스 종료. ExitCode: {process.ExitCode}");
 
