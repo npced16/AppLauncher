@@ -126,8 +126,9 @@ namespace AppLauncher
                 File.Copy(currentExePath, targetExePath, true);
                 DebugLog("[설치] 파일 복사 완료");
 
-                // Program Files 버전 실행하고 현재 프로세스 종료
-                // 작업 스케줄러 등록은 Program.cs에서 처리
+                // Program Files 버전 실행하고 현재 프로세스 (APPluncher) 종료
+                // 따라서 .NET 런타임 설치 여부와 상관없이 실행 가능
+                // 이미 관리자 권한으로 실행 중이므로 권한 문제 없음
                 DebugLog("[설치] Program Files 버전 실행...");
                 var startInfo = new ProcessStartInfo
                 {
@@ -279,6 +280,10 @@ namespace AppLauncher
                     DebugLog("[Main] 업데이트 완료. 컴퓨터 재시작 예정...");
                     return;
                 }
+                // 파일은 있지만 로드 실패한 경우: 로그 남기고 pending 제거 후 정상 모드로 진행
+                DebugLog("[Main] Pending update 파일을 로드하지 못했습니다. 정상 모드로 진행합니다.");
+                PendingUpdateManager.ClearPendingUpdate();
+                startSWApp();
             }
             catch (Exception ex)
             {

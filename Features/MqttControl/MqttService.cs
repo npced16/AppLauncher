@@ -295,44 +295,65 @@ namespace AppLauncher.Features.MqttControl
         }
 
         /// <summary>
-        /// 자동 재연결 로직 (60초 간격으로 시도, 최대 100회)
+        /// 인터넷 연결 상태 확인
+        /// </summary>
+        private bool IsInternetAvailable()
+        {
+            try
+            {
+                using (var client = new System.Net.NetworkInformation.Ping())
+                {
+                    // Google DNS로 ping (8.8.8.8)
+                    var reply = client.Send("8.8.8.8", 3000);
+                    return reply.Status == System.Net.NetworkInformation.IPStatus.Success;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 자동 재연결 로직 (1분 간격으로 무한 재시도)
         /// </summary>
         private async Task AutoReconnectAsync()
         {
             _isReconnecting = true;
             int retryCount = 0;
-            const int maxRetries = 100; // 최대 100회 (약 100분)
 
-            while (!_isConnected && !_isDisposed && retryCount < maxRetries)
+            while (!_isConnected && !_isDisposed)
             {
                 try
                 {
-                    LogMessage?.Invoke($"60초 후 자동 재연결 시도... ({retryCount + 1}/{maxRetries})");
+                    retryCount++;
+                    LogMessage?.Invoke($"60초 후 자동 재연결 시도... (시도 #{retryCount})");
                     await Task.Delay(60000); // 60초 대기
 
                     if (_isDisposed || _isConnected)
                         break;
 
-                    LogMessage?.Invoke($"MQTT 재연결 시도 중... ({retryCount + 1}/{maxRetries})");
+                    // 인터넷 연결 확인
+                    bool internetAvailable = IsInternetAvailable();
+                    if (!internetAvailable)
+                    {
+                        LogMessage?.Invoke($"[재연결 #{retryCount}] 인터넷 연결 없음 - 다음 시도 대기 중...");
+                        continue;
+                    }
+
+                    LogMessage?.Invoke($"MQTT 재연결 시도 중... (시도 #{retryCount})");
                     await ConnectAsync();
 
                     if (_isConnected)
                     {
-                        LogMessage?.Invoke("MQTT 재연결 성공!");
+                        LogMessage?.Invoke($"✅ MQTT 재연결 성공! (총 {retryCount}회 시도)");
                         break;
                     }
                 }
                 catch (Exception ex)
                 {
-                    LogMessage?.Invoke($"재연결 실패: {ex.Message}");
+                    LogMessage?.Invoke($"재연결 실패 (시도 #{retryCount}): {ex.Message}");
                 }
-
-                retryCount++;
-            }
-
-            if (retryCount >= maxRetries)
-            {
-                LogMessage?.Invoke($"[경고] 최대 재연결 시도 횟수({maxRetries})에 도달했습니다. 재연결을 중단합니다.");
             }
 
             _isReconnecting = false;

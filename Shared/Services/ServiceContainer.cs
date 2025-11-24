@@ -19,6 +19,7 @@ namespace AppLauncher.Shared.Services
         public static ApplicationLauncher? AppLauncher { get; set; }
         private static readonly object _lock = new object();
         private static Timer? _statusTimer;
+        private static Action<MqttMessage>? _messageReceivedHandler;
         /// <summary>
         /// 모든 서비스 초기화 및 MQTT 연결 시작
         /// </summary>
@@ -39,8 +40,9 @@ namespace AppLauncher.Shared.Services
                 MqttMessageHandler = new MqttMessageHandler(MqttService, config);
 
                 // MQTT 메시지 수신 이벤트 연결
-                MqttService.MessageReceived += (msg) => MqttMessageHandler?.HandleMessage(msg);
-
+                // MqttService.MessageReceived += (msg) => MqttMessageHandler?.HandleMessage(msg);
+                _messageReceivedHandler = (msg) => MqttMessageHandler?.HandleMessage(msg);
+                MqttService.MessageReceived += _messageReceivedHandler;
                 // MQTT 연결 상태 변경 이벤트 연결 (1분마다 상태 전송)
                 MqttService.ConnectionStateChanged += OnMqttConnectionStateChanged;
 
@@ -148,7 +150,11 @@ namespace AppLauncher.Shared.Services
                 try
                 {
                     // 이벤트 핸들러 제거 (메모리 누수 방지)
-                    mqttService.MessageReceived -= (msg) => MqttMessageHandler?.HandleMessage(msg);
+                    if (_messageReceivedHandler != null)
+                    {
+                        mqttService.MessageReceived -= _messageReceivedHandler;
+                        _messageReceivedHandler = null;
+                    }
                     mqttService.ConnectionStateChanged -= OnMqttConnectionStateChanged;
 
                     // 연결되어 있으면 끊기
