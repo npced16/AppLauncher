@@ -422,5 +422,8 @@ namespace AppLauncher.Features.MqttControl
         [JsonProperty("location")]
         public string? Location { get; set; }
 
+        [JsonProperty("settingContent")]
+        public string? SettingContent { get; set; }
+
     }
 }
