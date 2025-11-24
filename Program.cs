@@ -163,8 +163,10 @@ namespace AppLauncher
 #if DEBUG
             Console.WriteLine("=== AppLauncher 시작 ===");
 #endif
-            // 중복 실행 방지
-            DebugLog("\n[Main] 중복 실행 체크...");
+            // HBOT Operator 언인스톨 테스트
+            // var uninstallString = UninstallSWService.FindUninstallString("HBOT Operator");
+            // DebugLog($"[Uninstall] HBOT Operator UninstallString: {uninstallString ?? "없음"}");
+
 
             // 구버전 파일 삭제
             CleanupOldVersion();
@@ -264,6 +266,8 @@ namespace AppLauncher
         private static void UpdateLauncher()
         {
             DebugLog("[Main] Pending update 발견! 업데이트 진행...");
+            // HBOT Operator 언인스톨 
+            bool success = UninstallSWService.UninstallHbotOperator();
 
             try
             {
@@ -316,7 +320,6 @@ namespace AppLauncher
                             {
                                 var launcher = new ApplicationLauncher();
                                 ServiceContainer.AppLauncher = launcher; // 전역 컨테이너에 저장
-
                                 Action<string> statusCallback = status => DebugLog($"[LAUNCH] {status}");
                                 await launcher.CheckAndLaunchInBackgroundAsync(config, statusCallback);
                                 DebugLog("[Main] 백그라운드 프로그램 시작 완료");
