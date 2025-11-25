@@ -29,6 +29,10 @@ AppLauncher/
 ├── Shared/                             # 공통 유틸리티
 │   ├── Configuration/
 │   │   └── ConfigManager.cs            # 설정 파일 관리
+│   ├── Logger/
+│   │   └── FileLogger.cs               # MQTT 로그 파일 관리
+│   ├── Services/
+│   │   └── ServiceContainer.cs         # 전역 서비스 컨테이너
 │   ├── HardwareInfo.cs                 # 하드웨어 정보 수집
 │   ├── TaskSchedulerManager.cs         # 작업 스케줄러 관리
 │   └── VersionInfo.cs                  # 버전 정보 관리
@@ -58,8 +62,9 @@ C:\ProgramData\AppLauncher\
   ├─ Downloads\                  (다운로드 임시 파일)
   │   ├─ [zip 파일]
   │   └─ Volume\                 (압축 해제된 설치 파일)
-  ├─ Logs\                       (설치 로그)
-  │   └─ install_log_*.txt
+  ├─ Logs\                       (로그 파일 - 90일 자동 보관)
+  │   ├─ MQTT_YYYYMMDD.log       (MQTT 통신 로그)
+  │   └─ install_log_*.txt       (설치 로그)
   └─ Backup\                     (설정 백업)
       └─ setting_*.ini
 ```
@@ -93,12 +98,20 @@ dotnet watch run
 - **챔버 소프트웨어 업데이트**: ZIP 파일 다운로드 → 압축 해제 → 자동 설치
 - **런처 자체 업데이트**: EXE 파일 다운로드 → 교체 → 재시작 시 적용
 - **위치 변경**: MQTT Location 설정 변경
+- **통신 로그 기록**: 모든 MQTT 활동을 파일로 자동 기록 (90일 보관)
 
 ### 3. 안전한 업데이트 프로세스
 - 메타데이터 검증 (ProductName, CompanyName)
 - 설정 파일 자동 백업 및 복원
 - fonts_install 프로세스 자동 정리
 - 구버전 파일 자동 정리
+
+### 4. MQTT 로그 관리
+- **자동 파일 기록**: 연결, 메시지 수신/전송, 오류 등 모든 이벤트를 파일로 기록
+- **날짜별 로그 파일**: `MQTT_YYYYMMDD.log` 형식으로 일별 파일 생성
+- **자동 정리**: 90일(3개월) 이전 로그 파일 자동 삭제
+- **Tray 앱 독립**: 앱이 종료되어도 백그라운드에서 계속 기록
+- **로그 위치**: `C:\ProgramData\AppLauncher\Logs\`
 
 ## 업데이트 플로우
 
@@ -170,9 +183,9 @@ flowchart TD
 ```json
 {
   "targetExecutable": "C:\\Program Files (x86)\\HBOT Operator\\HBOT Operator.exe",
-  "localVersionFile": "version.txt",
+  "localVersionFile": "labview_version.txt",
   "mqttSettings": {
-    "broker": "server3.ibexserver.com",
+    "broker": "localhost",
     "port": 1883,
     "location": ""
   }
@@ -185,6 +198,27 @@ flowchart TD
 - **MQTTnet** 4.3.7.1207
 - **Newtonsoft.Json** 13.0.3
 
+## 주요 개선 사항
+
+### v1.1.0 (2025-01-21)
+- ✅ MQTT 파일 로깅 시스템 추가 (90일 자동 보관)
+- ✅ ServiceContainer 패턴 도입으로 전역 서비스 관리 개선
+- ✅ ObjectDisposedException 방어 코드 추가 (MqttControlForm)
+- ✅ Null 안전성 개선 (`_sendStatusResponse` 등)
+- ✅ 빌드 경고 개선 (34개 → 24개)
+- ✅ 이벤트 핸들러 메모리 누수 방지
+- ✅ MQTT 자동 재연결 로직 안정화 (최대 100회 제한)
+
 ## 라이선스
 
-본 프로젝트는 HBOT 챔버 시스템 관리를 위한 내부 도구입니다.
+```text
+ _______________________________________________________________________________________
+< 본 프로젝트는 HBOT 챔버 시스템 관리를 위한 내부 도구입니다. >
+ ----------------------------------------------------------------------------------------
+        \
+         \
+          /\_/\  
+         ( o.o )  
+          > ^ <
+
+```

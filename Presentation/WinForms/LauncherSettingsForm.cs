@@ -183,10 +183,6 @@ namespace AppLauncher.Presentation.WinForms
                 _config.TargetExecutable = targetExecutableTextBox.Text.Trim();
 
                 // MQTT Location 설정 저장
-                if (_config.MqttSettings == null)
-                {
-                    _config.MqttSettings = new MqttSettings();
-                }
                 _config.MqttSettings.Location = string.IsNullOrWhiteSpace(locationTextBox.Text) ? null : locationTextBox.Text.Trim();
 
                 ConfigManager.SaveConfig(_config);

@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using AppLauncher.Features.MqttControl;
+using AppLauncher.Shared;
 
 namespace AppLauncher.Features.VersionManagement
 {
@@ -9,6 +11,8 @@ namespace AppLauncher.Features.VersionManagement
     /// </summary>
     public static class PendingUpdateManager
     {
+        private static void Log(string message) => DebugLogger.Log("PENDING", message);
+
         private static readonly string PendingUpdateFilePath;
 
         static PendingUpdateManager()
@@ -26,9 +30,9 @@ namespace AppLauncher.Features.VersionManagement
         }
 
         /// <summary>
-        /// 업데이트 예약 저장
+        /// 업데이트 예약 저장 (LaunchCommand 직접 저장)
         /// </summary>
-        public static void SavePendingUpdate(PendingUpdate update)
+        public static bool SavePendingUpdate(LaunchCommand command)
         {
             try
             {
@@ -38,22 +42,23 @@ namespace AppLauncher.Features.VersionManagement
                     PropertyNameCaseInsensitive = true
                 };
 
-                string json = JsonSerializer.Serialize(update, options);
+                string json = JsonSerializer.Serialize(command, options);
                 File.WriteAllText(PendingUpdateFilePath, json);
 
-                Console.WriteLine($"[PENDING] Update scheduled and saved: {PendingUpdateFilePath}");
+                Log($"Update scheduled and saved: {PendingUpdateFilePath}");
+                return true;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[PENDING] Failed to save pending update: {ex.Message}");
+                Log($"Failed to save pending update: {ex.Message}");
                 throw;
             }
         }
 
         /// <summary>
-        /// 예약된 업데이트 읽기
+        /// 예약된 업데이트 읽기 (LaunchCommand 직접 반환)
         /// </summary>
-        public static PendingUpdate? LoadPendingUpdate()
+        public static LaunchCommand? LoadPendingUpdate()
         {
             try
             {
@@ -63,39 +68,86 @@ namespace AppLauncher.Features.VersionManagement
                 }
 
                 string json = File.ReadAllText(PendingUpdateFilePath);
+
+                // 빈 파일이거나 무효화된 파일 처리
+                if (string.IsNullOrWhiteSpace(json) || json.Trim() == "{}")
+                {
+                    Log($"Pending update file is empty or invalidated, cleaning up");
+                    ClearPendingUpdate();
+                    return null;
+                }
+
                 var options = new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 };
 
-                var update = JsonSerializer.Deserialize<PendingUpdate>(json, options);
-                Console.WriteLine($"[PENDING] Update loaded: {PendingUpdateFilePath}");
+                var command = JsonSerializer.Deserialize<LaunchCommand>(json, options);
 
-                return update;
+                // 필수 필드가 없으면 무효한 업데이트
+                if (command == null || string.IsNullOrEmpty(command.Version))
+                {
+                    Log($"Pending update has no valid command, cleaning up");
+                    ClearPendingUpdate();
+                    return null;
+                }
+
+                Log($"Update loaded: {PendingUpdateFilePath}");
+                return command;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[PENDING] Failed to load pending update: {ex.Message}");
+                Log($"Failed to load pending update: {ex.Message}");
+                // 파싱 실패 시 파일 정리
+                ClearPendingUpdate();
                 return null;
             }
         }
 
         /// <summary>
-        /// 예약된 업데이트 삭제
+        /// 예약된 업데이트 삭제 (재시도 로직 포함)
         /// </summary>
         public static void ClearPendingUpdate()
         {
+            if (!File.Exists(PendingUpdateFilePath))
+            {
+                Log($"No pending update file to clear");
+                return;
+            }
+
+            const int maxRetries = 5;
+            const int delayMs = 500;
+
+            for (int i = 0; i < maxRetries; i++)
+            {
+                try
+                {
+                    // 파일 속성 초기화 (읽기 전용 해제)
+                    File.SetAttributes(PendingUpdateFilePath, FileAttributes.Normal);
+                    File.Delete(PendingUpdateFilePath);
+                    Log($"Pending update cleared: {PendingUpdateFilePath}");
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    Log($"Delete attempt {i + 1}/{maxRetries} failed: {ex.Message}");
+
+                    if (i < maxRetries - 1)
+                    {
+                        System.Threading.Thread.Sleep(delayMs);
+                    }
+                }
+            }
+
+            // 마지막 시도: 파일 내용을 비워서 무효화
             try
             {
-                if (File.Exists(PendingUpdateFilePath))
-                {
-                    File.Delete(PendingUpdateFilePath);
-                    Console.WriteLine($"[PENDING] Pending update cleared: {PendingUpdateFilePath}");
-                }
+                File.WriteAllText(PendingUpdateFilePath, "{}");
+                Log($"Could not delete file, cleared contents instead");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[PENDING] Failed to clear pending update: {ex.Message}");
+                Log($"Failed to clear file contents: {ex.Message}");
             }
         }
 

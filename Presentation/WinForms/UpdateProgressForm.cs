@@ -1,8 +1,11 @@
 using System;
+using System.Diagnostics;
 using System.Drawing;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using AppLauncher.Features.MqttControl;
 using AppLauncher.Features.VersionManagement;
+using AppLauncher.Shared;
 using AppLauncher.Shared.Configuration;
 
 namespace AppLauncher.Presentation.WinForms
@@ -12,20 +15,22 @@ namespace AppLauncher.Presentation.WinForms
     /// </summary>
     public class UpdateProgressForm : Form
     {
+        private static void Log(string message) => DebugLogger.Log("UPDATE", message);
+
         private Label titleLabel = null!;
         private Label statusLabel = null!;
         private ProgressBar progressBar = null!;
         private Label detailLabel = null!;
-        private PendingUpdate _pendingUpdate = null!;
+        private LaunchCommand _command = null!;
         private LauncherConfig _config = null!;
         private bool _updateCompleted = false;
         private bool _updateSuccess = false;
         private Timer? _progressTimer;
         private int _targetProgress = 0;
 
-        public UpdateProgressForm(PendingUpdate pendingUpdate, LauncherConfig config)
+        public UpdateProgressForm(LaunchCommand command, LauncherConfig config)
         {
-            _pendingUpdate = pendingUpdate;
+            _command = command;
             _config = config;
             InitializeComponent();
             InitializeProgressAnimation();
@@ -72,7 +77,7 @@ namespace AppLauncher.Presentation.WinForms
             // 타이틀 레이블
             titleLabel = new Label
             {
-                Text = "LabView 업데이트 중",
+                Text = "챔버 소프트웨어 업데이트 중",
                 Font = new Font("Segoe UI", 32, FontStyle.Bold),
                 ForeColor = Color.White,
                 AutoSize = false,
@@ -175,7 +180,7 @@ namespace AppLauncher.Presentation.WinForms
 
                 // LabViewUpdater 생성
                 var updater = new LabViewUpdater(
-                    _pendingUpdate.Command,
+                    _command,
                     _config,
                     sendStatusResponse
                 );
@@ -199,10 +204,10 @@ namespace AppLauncher.Presentation.WinForms
                 else
                 {
                     _updateSuccess = false;
-                    UpdateStatus("업데이트 실패");
+                    UpdateStatus("업데이트 실패 - 기존 프로그램 실행");
                     statusLabel.ForeColor = Color.OrangeRed;
 
-                    await Task.Delay(3000);
+                    await Task.Delay(2000);
                 }
             }
             catch (Exception ex)
@@ -210,9 +215,9 @@ namespace AppLauncher.Presentation.WinForms
                 _updateSuccess = false;
                 UpdateStatus($"업데이트 오류: {ex.Message}");
                 statusLabel.ForeColor = Color.Red;
-                Console.WriteLine($"[UPDATE_ERROR] {ex.Message}");
+                Log($"Error: {ex.Message}");
 
-                await Task.Delay(3000);
+                await Task.Delay(2000);
             }
             finally
             {
@@ -221,15 +226,67 @@ namespace AppLauncher.Presentation.WinForms
                 // pending update 정리
                 PendingUpdateManager.ClearPendingUpdate();
 
-                // 업데이트 완료 후 컴퓨터 재시작
-                if (InvokeRequired)
+                if (_updateSuccess)
                 {
-                    Invoke(new Action(() => RestartComputer()));
+                    // 업데이트 성공 시 컴퓨터 재시작
+                    if (InvokeRequired)
+                    {
+                        Invoke(new Action(() => RestartComputer()));
+                    }
+                    else
+                    {
+                        RestartComputer();
+                    }
                 }
                 else
                 {
-                    RestartComputer();
+                    // 업데이트 실패 시 기존 프로그램 실행
+                    if (InvokeRequired)
+                    {
+                        Invoke(new Action(() => StartExistingApp()));
+                    }
+                    else
+                    {
+                        StartExistingApp();
+                    }
                 }
+            }
+        }
+
+        /// <summary>
+        /// 업데이트 실패 시 런처 재시작 (LabVIEW 앱 + TrayApp 정상 실행)
+        /// </summary>
+        private async void StartExistingApp()
+        {
+            try
+            {
+                UpdateStatus("런처를 재시작합니다...");
+                statusLabel.ForeColor = Color.LightBlue;
+
+                Log("Restarting launcher after update failure");
+
+                await Task.Delay(2000);
+                if (InvokeRequired)
+                {
+                    Invoke(new Action(() =>
+                    {
+                        this.Close();
+                        Application.Restart();
+                        Environment.Exit(0);
+                    }));
+                }
+                else
+                {
+                    this.Close();
+                    Application.Restart();
+                    Environment.Exit(0);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"Failed to restart launcher: {ex.Message}");
+
+                this.Close();
             }
         }
 
@@ -243,7 +300,7 @@ namespace AppLauncher.Presentation.WinForms
                 UpdateStatus("컴퓨터를 재시작합니다...");
                 statusLabel.ForeColor = Color.LightBlue;
 
-                Console.WriteLine("[UPDATE] Restarting computer...");
+                Log("Restarting computer...");
 
                 // shutdown 명령어로 컴퓨터 재시작 (10초 후)
                 var startInfo = new System.Diagnostics.ProcessStartInfo
@@ -271,7 +328,7 @@ namespace AppLauncher.Presentation.WinForms
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[UPDATE] Failed to restart computer: {ex.Message}");
+                Log($"Failed to restart computer: {ex.Message}");
 
                 // 재시작 실패 시 그냥 폼만 닫기
                 this.Close();
@@ -281,7 +338,7 @@ namespace AppLauncher.Presentation.WinForms
         private void UpdateStatus(string status)
         {
             statusLabel.Text = status;
-            detailLabel.Text = $"업데이트 정보:\n버전: {_pendingUpdate.Command.Version}\n시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+            detailLabel.Text = $"업데이트 정보:\n버전: {_command.Version}\n시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
         }
 
         private void UpdateInstallStatus(string status)
@@ -334,7 +391,7 @@ namespace AppLauncher.Presentation.WinForms
                     break;
 
                 default:
-                    Console.WriteLine($"[UPDATE] Unknown status: {status}");
+                    Log($"Unknown status: {status}");
                     break;
             }
         }

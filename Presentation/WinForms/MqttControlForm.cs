@@ -1,16 +1,19 @@
 using System;
 using System.Drawing;
+using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using AppLauncher.Features.MqttControl;
 using AppLauncher.Shared;
+using AppLauncher.Shared.Services;
 using AppLauncher.Shared.Configuration;
 
 namespace AppLauncher.Presentation.WinForms
 {
     public class MqttControlForm : Form
     {
-        private MqttService? _mqttService;
+        private MqttService _mqttService => ServiceContainer.MqttService!;
         private MqttSettings? _settings;
 
         private Label connectionStatusLabel;
@@ -25,11 +28,11 @@ namespace AppLauncher.Presentation.WinForms
         private Button clearLogButton;
         private Button closeButton;
 
-        public MqttControlForm(MqttService? mqttService = null)
+        public MqttControlForm()
         {
-            _mqttService = mqttService;
             InitializeComponent();
             LoadSettings();
+            LoadTodayLogFile();
         }
 
         private void InitializeComponent()
@@ -169,29 +172,13 @@ namespace AppLauncher.Presentation.WinForms
                 var config = ConfigManager.LoadConfig();
                 _settings = config.MqttSettings;
 
-                if (_settings != null)
-                {
-                    brokerInfoLabel.Text = $"브로커: {_settings.Broker}:{_settings.Port}";
-                    string clientId = _mqttService?.ClientId ?? HardwareInfo.GetHardwareUuid();
-                    clientIdLabel.Text = $"클라이언트 ID: {clientId}";
-                    topicLabel.Text = $"구독 토픽: device/{clientId}/commands";
+                brokerInfoLabel.Text = $"브로커: {_settings.Broker}:{_settings.Port}";
+                string clientId = _mqttService.ClientId;
+                clientIdLabel.Text = $"클라이언트 ID: {clientId}";
+                topicLabel.Text = $"구독 토픽: device/{clientId}/commands";
 
-                    if (_mqttService != null)
-                    {
-                        // 기존 서비스 사용
-                        AttachToExistingService();
-                    }
-                    else
-                    {
-                        // 새 서비스 생성
-                        InitializeMqttService();
-                    }
-                }
-                else
-                {
-                    AddLog("MQTT 설정을 찾을 수 없습니다.");
-                    connectButton.Enabled = false;
-                }
+                // 전역 MQTT 서비스에 연결
+                AttachToExistingService();
             }
             catch (Exception ex)
             {
@@ -201,56 +188,56 @@ namespace AppLauncher.Presentation.WinForms
 
         private void AttachToExistingService()
         {
-            if (_mqttService == null) return;
-
             // 이벤트 구독
             _mqttService.ConnectionStateChanged += OnConnectionStateChanged;
             _mqttService.LogMessage += OnLogMessage;
             _mqttService.MessageReceived += OnMessageReceived;
 
-            AddLog("기존 MQTT 서비스에 연결됨");
+            AddLog("전역 MQTT 서비스에 연결됨");
 
             // 현재 연결 상태 업데이트
             OnConnectionStateChanged(_mqttService.IsConnected);
         }
 
-        private void InitializeMqttService()
-        {
-            if (_settings == null) return;
-
-            // 하드웨어 UUID를 ClientId로 사용
-            string clientId = HardwareInfo.GetHardwareUuid();
-            _mqttService = new MqttService(_settings, clientId);
-
-            // 이벤트 구독
-            _mqttService.ConnectionStateChanged += OnConnectionStateChanged;
-            _mqttService.LogMessage += OnLogMessage;
-            _mqttService.MessageReceived += OnMessageReceived;
-
-            AddLog("새 MQTT 서비스 초기화 완료");
-        }
-
         private void OnConnectionStateChanged(bool isConnected)
         {
+            // Form이 이미 Dispose된 경우 무시
+            if (IsDisposed)
+                return;
+
             if (InvokeRequired)
             {
-                Invoke(new Action<bool>(OnConnectionStateChanged), isConnected);
+                try
+                {
+                    Invoke(new Action<bool>(OnConnectionStateChanged), isConnected);
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Form이 닫히는 중이면 무시
+                }
                 return;
             }
 
-            if (isConnected)
+            try
             {
-                connectionStatusLabel.Text = "연결됨";
-                connectionStatusLabel.ForeColor = Color.Green;
-                connectButton.Enabled = false;
-                disconnectButton.Enabled = true;
+                if (isConnected)
+                {
+                    connectionStatusLabel.Text = "연결됨";
+                    connectionStatusLabel.ForeColor = Color.Green;
+                    connectButton.Enabled = false;
+                    disconnectButton.Enabled = true;
+                }
+                else
+                {
+                    connectionStatusLabel.Text = "연결 안됨";
+                    connectionStatusLabel.ForeColor = Color.Red;
+                    connectButton.Enabled = true;
+                    disconnectButton.Enabled = false;
+                }
             }
-            else
+            catch (ObjectDisposedException)
             {
-                connectionStatusLabel.Text = "연결 안됨";
-                connectionStatusLabel.ForeColor = Color.Red;
-                connectButton.Enabled = true;
-                disconnectButton.Enabled = false;
+                // Form이 닫히는 중이면 무시
             }
         }
 
@@ -261,6 +248,10 @@ namespace AppLauncher.Presentation.WinForms
 
         private void OnMessageReceived(MqttMessage message)
         {
+            // Form이 이미 Dispose된 경우 무시
+            if (IsDisposed)
+                return;
+
             AddLog($"[메시지 수신] 토픽: {message.Topic}");
 
             // JSON 파싱 시도 후 예쁘게 출력
@@ -280,37 +271,49 @@ namespace AppLauncher.Presentation.WinForms
 
         private void AddLog(string message)
         {
+            // Form이나 TextBox가 이미 Dispose된 경우 무시
+            if (IsDisposed || logTextBox.IsDisposed)
+                return;
+
             if (InvokeRequired)
             {
-                Invoke(new Action<string>(AddLog), message);
+                try
+                {
+                    Invoke(new Action<string>(AddLog), message);
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Form이 닫히는 중이면 무시
+                }
                 return;
             }
 
-            var timestamp = DateTime.Now.ToString("HH:mm:ss");
-            var logEntry = $"[{timestamp}] {message}\r\n";
-
-            if (logTextBox.Text == "로그가 여기에 표시됩니다...")
+            try
             {
-                logTextBox.Text = logEntry;
-            }
-            else
-            {
-                logTextBox.AppendText(logEntry);
-            }
+                var timestamp = DateTime.Now.ToString("HH:mm:ss");
+                var logEntry = $"[{timestamp}] {message}\r\n";
 
-            // 자동 스크롤
-            logTextBox.SelectionStart = logTextBox.Text.Length;
-            logTextBox.ScrollToCaret();
+                if (logTextBox.Text == "로그가 여기에 표시됩니다...")
+                {
+                    logTextBox.Text = logEntry;
+                }
+                else
+                {
+                    logTextBox.AppendText(logEntry);
+                }
+
+                // 자동 스크롤
+                logTextBox.SelectionStart = logTextBox.Text.Length;
+                logTextBox.ScrollToCaret();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Form이 닫히는 중이면 무시
+            }
         }
 
         private async void ConnectButton_Click(object? sender, EventArgs e)
         {
-            if (_mqttService == null)
-            {
-                AddLog("❌ MQTT 서비스가 초기화되지 않았습니다.");
-                return;
-            }
-
             try
             {
                 connectButton.Enabled = false;
@@ -329,8 +332,6 @@ namespace AppLauncher.Presentation.WinForms
 
         private async void DisconnectButton_Click(object? sender, EventArgs e)
         {
-            if (_mqttService == null) return;
-
             try
             {
                 disconnectButton.Enabled = false;
@@ -352,12 +353,6 @@ namespace AppLauncher.Presentation.WinForms
 
         private async void ReconnectButton_Click(object? sender, EventArgs e)
         {
-            if (_mqttService == null)
-            {
-                AddLog("❌ MQTT 서비스가 초기화되지 않았습니다.");
-                return;
-            }
-
             try
             {
                 reconnectButton.Enabled = false;
@@ -411,15 +406,49 @@ namespace AppLauncher.Presentation.WinForms
             }
         }
 
+        /// <summary>
+        /// 오늘의 로그 파일을 불러와서 표시
+        /// </summary>
+        private void LoadTodayLogFile()
+        {
+            try
+            {
+                // 로그 파일 경로 (C:\ProgramData\AppLauncher\Logs\MQTT_YYYYMMDD.log)
+                string programDataPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+                string logDirectory = Path.Combine(programDataPath, "AppLauncher", "Logs");
+                string logFileName = $"MQTT_{DateTime.Now:yyyyMMdd}.log";
+                string logFilePath = Path.Combine(logDirectory, logFileName);
+
+                if (File.Exists(logFilePath))
+                {
+                    // 파일 내용 읽기 (마지막 500줄만)
+                    var lines = File.ReadAllLines(logFilePath);
+                    int startIndex = Math.Max(0, lines.Length - 500);
+                    var recentLines = lines.Skip(startIndex);
+
+                    logTextBox.Text = string.Join("\r\n", recentLines);
+                    logTextBox.SelectionStart = logTextBox.Text.Length;
+                    logTextBox.ScrollToCaret();
+
+                    AddLog($"--- 로그 파일 로드 완료 (최근 {recentLines.Count()}줄) ---");
+                }
+                else
+                {
+                    AddLog("--- 오늘의 로그 파일이 아직 없습니다 ---");
+                }
+            }
+            catch (Exception ex)
+            {
+                AddLog($"--- 로그 파일 로드 오류: {ex.Message} ---");
+            }
+        }
+
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             // 창이 닫힐 때 이벤트만 정리 (서비스는 유지)
-            if (_mqttService != null)
-            {
-                _mqttService.ConnectionStateChanged -= OnConnectionStateChanged;
-                _mqttService.LogMessage -= OnLogMessage;
-                _mqttService.MessageReceived -= OnMessageReceived;
-            }
+            _mqttService.ConnectionStateChanged -= OnConnectionStateChanged;
+            _mqttService.LogMessage -= OnLogMessage;
+            _mqttService.MessageReceived -= OnMessageReceived;
 
             base.OnFormClosing(e);
         }

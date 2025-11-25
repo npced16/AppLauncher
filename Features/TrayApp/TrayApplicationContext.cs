@@ -10,35 +10,24 @@ using AppLauncher.Features.MqttControl;
 using AppLauncher.Presentation.WinForms;
 using AppLauncher.Shared;
 using AppLauncher.Shared.Configuration;
+using AppLauncher.Shared.Services;
 
 namespace AppLauncher.Features.TrayApp
 {
     public class TrayApplicationContext : ApplicationContext
     {
+        private static void Log(string message) => DebugLogger.Log("TrayApp", message);
+
         private NotifyIcon? _notifyIcon;
         private MainForm? _mainForm;
         private MqttControlForm? _mqttControlForm;
         private LauncherSettingsForm? _launcherSettingsForm;
-        private MqttService? _mqttService;
-        private MqttMessageHandler? _mqttMessageHandler;
         private LauncherConfig? _config;
-        private System.Timers.Timer? _statusTimer;
-        private System.Timers.Timer? _reconnectTimer;
-
-        private static void DebugLog(string message)
-        {
-#if DEBUG
-            Console.WriteLine(message);
-#endif
-        }
 
         public TrayApplicationContext()
         {
-            DebugLog("[TrayApplicationContext] InitializeTrayIcon 호출");
+            Log("InitializeTrayIcon 호출");
             InitializeTrayIcon();
-            DebugLog("[TrayApplicationContext] StartServices 호출");
-            StartServices();
-            DebugLog("[TrayApplicationContext] 생성자 완료");
         }
 
 
@@ -118,203 +107,67 @@ namespace AppLauncher.Features.TrayApp
             _notifyIcon.ContextMenuStrip = contextMenu;
         }
 
-        private async void StartServices()
+        private async void ShowMainForm(object? sender, EventArgs e)
         {
             try
             {
+                var config = ConfigManager.LoadConfig();
 
-                // 설정 로드
-                _config = ConfigManager.LoadConfig();
+                // ServiceContainer의 ApplicationLauncher 사용
+                var launcher = ServiceContainer.AppLauncher;
 
-                // MQTT 서비스 시작
-                if (_config.MqttSettings != null)
+                if (launcher == null)
                 {
-                    await StartMqttServiceAsync();
+                    // ApplicationLauncher가 아직 생성되지 않았으면 생성
+                    launcher = new ApplicationLauncher();
+                    ServiceContainer.AppLauncher = launcher;
                 }
 
-            }
-            catch (Exception ex)
-            {
-                _notifyIcon.ShowBalloonTip(3000, "오류", ex.Message, ToolTipIcon.Error);
-            }
-        }
+                // 현재 실행 중인 프로세스 확인
+                var runningProcess = launcher.GetRunningProcess();
 
-        private async Task StartMqttServiceAsync()
-        {
-            try
-            {
-                if (_config?.MqttSettings == null)
+                if (runningProcess != null && runningProcess.IsRunning)
                 {
+                    MessageBox.Show(
+                        $"이미 실행 중입니다.\n\n{launcher.GetProcessStatusSummary()}",
+                        "앱 실행",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information
+                    );
                     return;
                 }
 
-                // 하드웨어 UUID를 ClientId로 사용
-                string clientId = HardwareInfo.GetHardwareUuid();
-                _mqttService = new MqttService(_config.MqttSettings, clientId);
+                // 파일 존재 확인
+                if (string.IsNullOrEmpty(config.TargetExecutable) || !File.Exists(config.TargetExecutable))
+                {
+                    MessageBox.Show(
+                        "대상 실행 파일이 설정되지 않았거나 존재하지 않습니다.\n설정에서 실행 파일을 지정해주세요.",
+                        "앱 실행",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning
+                    );
+                    return;
+                }
 
-                // MQTT 메시지 핸들러 생성
-                _mqttMessageHandler = new MqttMessageHandler(
-                    _mqttService,
-                    _config,
-                    ShowBalloonTip
+                // 앱 실행
+                Action<string> statusCallback = status => Log($"[LAUNCH] {status}");
+                await launcher.CheckAndLaunchInBackgroundAsync(config, statusCallback);
+
+                // MessageBox.Show(
+                //     "앱을 실행했습니다.",
+                //     "앱 실행",
+                //     MessageBoxButtons.OK,
+                //     MessageBoxIcon.Information
+                // );
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"앱 실행 오류:\n{ex.Message}",
+                    "오류",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
                 );
-
-                // 이벤트 핸들러 등록
-                _mqttService.MessageReceived += (msg) => _mqttMessageHandler?.HandleMessage(msg);
-                _mqttService.ConnectionStateChanged += OnMqttConnectionStateChanged;
-                _mqttService.LogMessage += OnMqttLogMessage;
-
-                // MQTT 브로커 연결
-                await _mqttService.ConnectAsync();
-            }
-            catch (Exception ex)
-            {
-                string errorDetail = ex.Message;
-                if (ex.InnerException != null)
-                {
-                    errorDetail += $"\n상세: {ex.InnerException.Message}";
-                }
-
-                Console.WriteLine($"[MQTT] Initial connection failed: {errorDetail}");
-
-                // 최초 연결 실패 시 재연결 타이머 시작
-                StartReconnectTimer();
-            }
-        }
-
-        private void OnMqttConnectionStateChanged(bool isConnected)
-        {
-            if (isConnected)
-            {
-                // 연결 성공 시 재연결 타이머 중지
-                StopReconnectTimer();
-
-                // 연결 성공 시 초기 상태 전송
-                _mqttMessageHandler?.SendStatus("connected");
-
-                // 1분마다 상태 전송 타이머 시작
-                StartStatusTimer();
-            }
-            else
-            {
-                // 연결 끊어지면 상태 타이머 중지
-                StopStatusTimer();
-
-                // 1분마다 재연결 시도 타이머 시작
-                StartReconnectTimer();
-            }
-        }
-
-        private void StartStatusTimer()
-        {
-            // 기존 타이머가 있으면 중지
-            StopStatusTimer();
-
-            // 1분(60초) 간격으로 타이머 생성
-            _statusTimer = new System.Timers.Timer(60000);
-            _statusTimer.Elapsed += OnStatusTimerElapsed;
-            _statusTimer.AutoReset = true;
-            _statusTimer.Start();
-            Console.WriteLine("[MQTT] Status timer started (interval: 60 seconds)");
-        }
-
-        private void StopStatusTimer()
-        {
-            if (_statusTimer != null)
-            {
-                _statusTimer.Stop();
-                _statusTimer.Elapsed -= OnStatusTimerElapsed;
-                _statusTimer.Dispose();
-                _statusTimer = null;
-
-                Console.WriteLine("[MQTT] Status timer stopped");
-            }
-        }
-
-        private void OnStatusTimerElapsed(object? sender, ElapsedEventArgs e)
-        {
-            try
-            {
-                // 1분마다 자동으로 상태 전송
-                _mqttMessageHandler?.SendStatus("current_status");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[MQTT] Status timer error: {ex.Message}");
-            }
-        }
-
-        private void StartReconnectTimer()
-        {
-            // 기존 타이머가 있으면 중지
-            StopReconnectTimer();
-
-            // 1분(60초) 간격으로 재연결 시도 타이머 생성
-            _reconnectTimer = new System.Timers.Timer(60000);
-            _reconnectTimer.Elapsed += OnReconnectTimerElapsed;
-            _reconnectTimer.AutoReset = true;
-            _reconnectTimer.Start();
-
-            Console.WriteLine("[MQTT] Reconnect timer started (interval: 60 seconds)");
-        }
-
-        private void StopReconnectTimer()
-        {
-            if (_reconnectTimer != null)
-            {
-                _reconnectTimer.Stop();
-                _reconnectTimer.Elapsed -= OnReconnectTimerElapsed;
-                _reconnectTimer.Dispose();
-                _reconnectTimer = null;
-
-                Console.WriteLine("[MQTT] Reconnect timer stopped");
-            }
-        }
-
-        private async void OnReconnectTimerElapsed(object? sender, ElapsedEventArgs e)
-        {
-            try
-            {
-                Console.WriteLine("[MQTT] Attempting to reconnect...");
-
-                if (_mqttService != null && !_mqttService.IsConnected)
-                {
-                    await _mqttService.ConnectAsync();
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[MQTT] Reconnect failed: {ex.Message}");
-            }
-        }
-
-        private void OnMqttLogMessage(string message)
-        {
-            System.Diagnostics.Debug.WriteLine($"[MQTT] {message}");
-        }
-
-        private void ShowBalloonTip(string title, string message, int timeout)
-        {
-            if (_notifyIcon != null)
-            {
-                _notifyIcon.ShowBalloonTip(timeout, title, message, ToolTipIcon.Info);
-            }
-        }
-
-        private void ShowMainForm(object? sender, EventArgs e)
-        {
-            if (_mainForm == null || _mainForm.IsDisposed)
-            {
-                _mainForm = new MainForm();
-                _mainForm.FormClosed += (s, args) =>
-                {
-                    _mainForm = null;
-                };
-                _mainForm.Show();
-            }
-            else
-            {
-                _mainForm.Activate();
             }
         }
 
@@ -341,8 +194,8 @@ namespace AppLauncher.Features.TrayApp
         {
             if (_mqttControlForm == null || _mqttControlForm.IsDisposed)
             {
-                // 기존 MqttService 인스턴스를 전달
-                _mqttControlForm = new MqttControlForm(_mqttService);
+                // 전역 MqttService 사용
+                _mqttControlForm = new MqttControlForm();
                 _mqttControlForm.FormClosed += (s, args) =>
                 {
                     _mqttControlForm = null;
@@ -374,14 +227,6 @@ namespace AppLauncher.Features.TrayApp
                 {
                     _launcherSettingsForm.Close();
                 }
-
-                // MQTT 연결 해제
-                if (_mqttService != null && _mqttService.IsConnected)
-                {
-                    await _mqttService.DisconnectAsync();
-                    await Task.Delay(500); // MQTT 연결 해제 대기
-                }
-
                 // 리소스 정리
                 Dispose();
 
@@ -402,27 +247,15 @@ namespace AppLauncher.Features.TrayApp
 
         public new void Dispose()
         {
-            // 상태 전송 타이머 정리
-            StopStatusTimer();
-
-            // 재연결 타이머 정리
-            StopReconnectTimer();
-
-            // MQTT 서비스 정리
-            if (_mqttService != null)
-            {
-                _mqttService.DisconnectAsync().Wait();
-                _mqttService.Dispose();
-                _mqttService = null;
-            }
-
             // 트레이 아이콘 정리
             if (_notifyIcon != null)
             {
                 _notifyIcon.Visible = false;
                 _notifyIcon.Dispose();
                 _notifyIcon = null;
+
             }
+            base.Dispose();
         }
     }
 }

@@ -8,12 +8,15 @@ using System.Net.Http;
 using System.Security.Principal;
 using System.Threading.Tasks;
 using AppLauncher.Features.MqttControl;
+using AppLauncher.Shared;
 using AppLauncher.Shared.Configuration;
 
 namespace AppLauncher.Features.VersionManagement
 {
     public class LabViewUpdater
     {
+        private static void Log(string message) => DebugLogger.Log("LabViewUpdate", message);
+
         private readonly LaunchCommand _command;
         private readonly LauncherConfig _config;
         private readonly Action<string, string>? _sendStatusResponse;
@@ -32,28 +35,85 @@ namespace AppLauncher.Features.VersionManagement
 
 
         /// <summary>
-        /// 업데이트를 예약 (다음 런처 재시작 시 자동 실행)
+        /// 업데이트를 예약
+        /// - isDownloadImmediate가 false인 경우: 다음 런처 재시작 시 자동 실행
+        /// - isDownloadImmediate가 true인 경우: 런처를 즉시 재시작하여 업데이트 진행
         /// </summary>
-        public void ScheduleUpdate()
+        public async Task ScheduleUpdate(bool isDownloadImmediate)
         {
             try
             {
-                Console.WriteLine("[SCHEDULE] Scheduling update for next launcher restart");
+                Log("[SCHEDULE] Scheduling update for next launcher restart");
 
-                // 업데이트 정보를 JSON에 저장
-                var pendingUpdate = new PendingUpdate
+                // 업데이트 정보를 JSON에 저장 (LaunchCommand 직접 저장)
+                try
                 {
-                    Command = _command,
-                    ScheduledTime = DateTime.Now,
-                    Description = $"챔버 소프트웨어 {_command.Version} 업데이트"
-                };
+                    bool saved = PendingUpdateManager.SavePendingUpdate(_command);
+                    if (!saved)
+                    {
+                        Log("[SCHEDULE] Failed to save pending update");
+                        _sendStatusResponse?.Invoke("error", "업데이트 예약 저장 실패");
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log($"[SCHEDULE] Exception saving pending update: {ex.Message}");
+                    _sendStatusResponse?.Invoke("error", $"업데이트 예약 저장 실패: {ex.Message}");
+                    return;
+                }
 
-                PendingUpdateManager.SavePendingUpdate(pendingUpdate);
-                Console.WriteLine("[SCHEDULE] Update scheduled successfully. Will be applied on next restart.");
+                // 즉시 실행 모드: 런처 재시작하여 UpdateProgressForm으로 업데이트 진행
+                if (isDownloadImmediate)
+                {
+                    await Task.Delay(1000);
+                    RestartLauncher();
+                }
+                else
+                {
+                    Log("[SCHEDULE] Will be applied on next restart.");
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[SCHEDULE] Failed to schedule update: {ex.Message}");
+                Log($"[SCHEDULE] Failed to schedule update: {ex.Message}");
+                _sendStatusResponse?.Invoke("error", ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 런처 재시작
+        /// </summary>
+        private void RestartLauncher()
+        {
+            try
+            {
+                Log("[RESTART] Restarting launcher...");
+
+                string exePath = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName ?? "";
+
+                if (!string.IsNullOrEmpty(exePath))
+                {
+                    var startInfo = new ProcessStartInfo
+                    {
+                        FileName = exePath,
+                    };
+
+                    Process.Start(startInfo);
+                    Log("[RESTART] New launcher process started");
+
+                    // 현재 프로세스 종료
+                    //NOTE - 프로세스가 시작될떄 종료되긴하나 명시적으로 종료처리
+                    Environment.Exit(0);
+                }
+                else
+                {
+                    Log("[RESTART] Failed to get launcher path");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"[RESTART] Failed to restart launcher: {ex.Message}");
             }
         }
 
@@ -70,7 +130,7 @@ namespace AppLauncher.Features.VersionManagement
 
                 if (!File.Exists(settingFilePath))
                 {
-                    Console.WriteLine($"[BACKUP] setting.ini not found: {settingFilePath}");
+                    Log($"[BACKUP] setting.ini not found: {settingFilePath}");
                     return null;
                 }
 
@@ -88,13 +148,13 @@ namespace AppLauncher.Features.VersionManagement
                 // 파일 복사
                 File.Copy(settingFilePath, backupFilePath, overwrite: true);
 
-                Console.WriteLine($"[BACKUP] Setting file backed up: {backupFilePath}");
+                Log($"[BACKUP] Setting file backed up: {backupFilePath}");
 
                 return backupFilePath;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[BACKUP] Failed to backup setting file: {ex.Message}");
+                Log($"[BACKUP] Failed to backup setting file: {ex.Message}");
                 return null;
             }
         }
@@ -109,7 +169,7 @@ namespace AppLauncher.Features.VersionManagement
             {
                 if (string.IsNullOrEmpty(backupFilePath) || !File.Exists(backupFilePath))
                 {
-                    Console.WriteLine($"[RESTORE] No backup file to restore");
+                    Log($"[RESTORE] No backup file to restore");
                     return;
                 }
 
@@ -127,7 +187,7 @@ namespace AppLauncher.Features.VersionManagement
                 // 파일 복원
                 File.Copy(backupFilePath, settingFilePath, overwrite: true);
 
-                Console.WriteLine($"[RESTORE] Setting file restored: {settingFilePath}");
+                Log($"[RESTORE] Setting file restored: {settingFilePath}");
 
                 _sendStatusResponse?.Invoke("restore_done", "설정 파일 복원 완료");
 
@@ -136,7 +196,7 @@ namespace AppLauncher.Features.VersionManagement
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[RESTORE] Failed to restore setting file: {ex.Message}");
+                Log($"[RESTORE] Failed to restore setting file: {ex.Message}");
             }
         }
 
@@ -156,6 +216,11 @@ namespace AppLauncher.Features.VersionManagement
                     Directory.CreateDirectory(tempDir);
 
                 // 파일명 추출
+                if (string.IsNullOrEmpty(_command.URL))
+                {
+                    Log("[LabViewUpdater] URL이 비어있습니다.");
+                    return "";
+                }
                 string fileName = Path.GetFileName(new Uri(_command.URL).LocalPath);
                 bool isZipFile = fileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase);
                 bool isExeFile = fileName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase);
@@ -167,7 +232,7 @@ namespace AppLauncher.Features.VersionManagement
                 }
 
                 string downloadPath = Path.Combine(tempDir, fileName);
-                _sendStatusResponse("download_start", "파일 다운로드 시작");
+                _sendStatusResponse?.Invoke("download_start", "파일 다운로드 시작");
                 // HttpClient로 다운로드
                 using (var httpClient = new System.Net.Http.HttpClient())
                 {
@@ -179,20 +244,20 @@ namespace AppLauncher.Features.VersionManagement
                     {
                         await response.Content.CopyToAsync(fs);
                     }
-                    _sendStatusResponse("download_complete", "파일 다운로드 완료");
+                    _sendStatusResponse?.Invoke("download_complete", "파일 다운로드 완료");
                 }
 
                 if (!File.Exists(downloadPath))
                 {
                     return "";
                 }
-                _sendStatusResponse("extract_start", "압축 해제 시작");
+                _sendStatusResponse?.Invoke("extract_start", "압축 해제 시작");
 
                 // zip 파일이면 압축 해제
                 if (isZipFile)
                 {
                     await ExtractZipFileAsync(downloadPath);
-                    _sendStatusResponse("extract_done", "압축 해제 완료");
+                    _sendStatusResponse?.Invoke("extract_done", "압축 해제 완료");
 
                 }
                 else
@@ -205,6 +270,7 @@ namespace AppLauncher.Features.VersionManagement
             }
             catch (Exception ex)
             {
+                Log($"[LabViewUpdater] 다운로드 및 실행 오류: {ex.Message}");
                 return "";
             }
         }
@@ -229,13 +295,13 @@ namespace AppLauncher.Features.VersionManagement
                     Directory.CreateDirectory(extractDir);
                 }
 
-                Console.WriteLine($"[ZIP] Extracting to: {extractDir}");
+                Log($"[ZIP] Extracting to: {extractDir}");
 
                 // 기존 Volume 폴더가 있으면 삭제
                 string volumeDir = Path.Combine(extractDir, "Volume");
                 if (Directory.Exists(volumeDir))
                 {
-                    Console.WriteLine($"[ZIP] Deleting existing Volume folder: {volumeDir}");
+                    Log($"[ZIP] Deleting existing Volume folder: {volumeDir}");
                     Directory.Delete(volumeDir, recursive: true);
                 }
 
@@ -245,29 +311,29 @@ namespace AppLauncher.Features.VersionManagement
                     ZipFile.ExtractToDirectory(zipFilePath, extractDir, overwriteFiles: true);
                 });
 
-                Console.WriteLine($"[ZIP] Extraction completed: {extractDir}");
+                Log($"[ZIP] Extraction completed: {extractDir}");
 
 
                 string HBOTOperatorPath = Path.Combine(extractDir, "HBOT Operator.exe");
                 if (File.Exists(HBOTOperatorPath))
                 {
-                    Console.WriteLine($"[ZIP] Found HBOT Operator.exe: {HBOTOperatorPath}");
+                    Log($"[ZIP] Found HBOT Operator.exe: {HBOTOperatorPath}");
 
                     // 메타데이터 검증
                     if (!ValidateExecutableMetadata(HBOTOperatorPath, "HBOT Operator", "Ibex Medical Systems"))
                     {
-                        Console.WriteLine($"[ZIP] HBOT Operator.exe validation failed - executing file directly");
+                        Log($"[ZIP] HBOT Operator.exe validation failed - executing file directly");
                         _sendStatusResponse?.Invoke("validation_failed", "파일 검증 실패 - 파일 실행");
 
                         // 검증 실패 시 HBOT Operator.exe 실행
                         ExecuteProgram(HBOTOperatorPath);
                         return;
                     }
-                    Console.WriteLine($"[ZIP] HBOT Operator.exe validation successful - proceeding with setup.exe");
+                    Log($"[ZIP] HBOT Operator.exe validation successful - proceeding with setup.exe");
                 }
                 else
                 {
-                    Console.WriteLine($"[ZIP] HBOT Operator.exe not found in {extractDir}");
+                    Log($"[ZIP] HBOT Operator.exe not found in {extractDir}");
                     return;
                 }
 
@@ -276,7 +342,7 @@ namespace AppLauncher.Features.VersionManagement
 
                 if (File.Exists(setupExePath))
                 {
-                    Console.WriteLine($"[ZIP] Found setup.exe in Volume folder: {setupExePath}");
+                    Log($"[ZIP] Found setup.exe in Volume folder: {setupExePath}");
 
                     // setup.exe 메타데이터 로그 출력
                     // LogExecutableMetadata(setupExePath);
@@ -285,12 +351,12 @@ namespace AppLauncher.Features.VersionManagement
                 }
                 else
                 {
-                    Console.WriteLine($"[ZIP] setup.exe not found in {volumeDir}");
+                    Log($"[ZIP] setup.exe not found in {volumeDir}");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ZIP] Extraction error: {ex.Message}");
+                Log($"[ZIP] Extraction error: {ex.Message}");
             }
         }
 
@@ -314,7 +380,6 @@ namespace AppLauncher.Features.VersionManagement
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = executable,
-                    UseShellExecute = true
                 };
 
                 // 작업 디렉토리는 실행 파일의 디렉토리로 자동 설정
@@ -364,23 +429,23 @@ namespace AppLauncher.Features.VersionManagement
                         {
                             File.Delete(logFile);
                             deletedCount++;
-                            Console.WriteLine($"[CLEANUP] Deleted old log file: {Path.GetFileName(logFile)} (Created: {fileInfo.CreationTime:yyyy-MM-dd})");
+                            Log($"[CLEANUP] Deleted old log file: {Path.GetFileName(logFile)} (Created: {fileInfo.CreationTime:yyyy-MM-dd})");
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[CLEANUP] Failed to delete log file {Path.GetFileName(logFile)}: {ex.Message}");
+                        Log($"[CLEANUP] Failed to delete log file {Path.GetFileName(logFile)}: {ex.Message}");
                     }
                 }
 
                 if (deletedCount > 0)
                 {
-                    Console.WriteLine($"[CLEANUP] Deleted {deletedCount} old log file(s)");
+                    Log($"[CLEANUP] Deleted {deletedCount} old log file(s)");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[CLEANUP] Failed to cleanup old log files: {ex.Message}");
+                Log($"[CLEANUP] Failed to cleanup old log files: {ex.Message}");
             }
         }
 
@@ -404,7 +469,7 @@ namespace AppLauncher.Features.VersionManagement
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[CHILD_PROCESS] Failed to get child processes for PID {parentProcessId}: {ex.Message}");
+                Log($"[CHILD_PROCESS] Failed to get child processes for PID {parentProcessId}: {ex.Message}");
                 return new int[0];
             }
         }
@@ -445,13 +510,13 @@ namespace AppLauncher.Features.VersionManagement
                 }
 
                 // 부모 프로세스가 지정된 경우, 해당 부모의 자손 프로세스만 필터링
-                int[] targetPids = null;
+                int[]? targetPids = null;
                 if (parentProcessId.HasValue)
                 {
                     targetPids = GetAllDescendantProcessIds(parentProcessId.Value);
                     if (targetPids.Length > 0)
                     {
-                        Console.WriteLine($"[KILL_PROCESS] Found {targetPids.Length} descendant process(es) of PID {parentProcessId.Value}: {string.Join(", ", targetPids)}");
+                        Log($"[KILL_PROCESS] Found {targetPids.Length} descendant process(es) of PID {parentProcessId.Value}: {string.Join(", ", targetPids)}");
                     }
                 }
 
@@ -462,18 +527,18 @@ namespace AppLauncher.Features.VersionManagement
                         // 프로세스가 이미 종료되었는지 확인
                         if (process.HasExited)
                         {
-                            Console.WriteLine($"[KILL_PROCESS] Process already exited (PID: {process.Id})");
+                            Log($"[KILL_PROCESS] Process already exited (PID: {process.Id})");
                             continue;
                         }
 
                         // 부모 프로세스가 지정된 경우, 해당 부모의 자손인지 확인
                         if (parentProcessId.HasValue && targetPids != null && !targetPids.Contains(process.Id))
                         {
-                            Console.WriteLine($"[KILL_PROCESS] Skipping fonts_install (PID: {process.Id}) - not a descendant of PID {parentProcessId.Value}");
+                            Log($"[KILL_PROCESS] Skipping fonts_install (PID: {process.Id}) - not a descendant of PID {parentProcessId.Value}");
                             continue;
                         }
 
-                        Console.WriteLine($"[KILL_PROCESS] Killing fonts_install process (PID: {process.Id})");
+                        Log($"[KILL_PROCESS] Killing fonts_install process (PID: {process.Id})");
                         process.Kill();
 
                         // 프로세스가 종료될 때까지 대기 (최대 3초)
@@ -481,32 +546,32 @@ namespace AppLauncher.Features.VersionManagement
 
                         if (exited)
                         {
-                            Console.WriteLine($"[KILL_PROCESS] Process killed successfully (PID: {process.Id})");
+                            Log($"[KILL_PROCESS] Process killed successfully (PID: {process.Id})");
                         }
                         else
                         {
-                            Console.WriteLine($"[KILL_PROCESS] Process did not exit within timeout (PID: {process.Id})");
+                            Log($"[KILL_PROCESS] Process did not exit within timeout (PID: {process.Id})");
                         }
                     }
                     catch (System.ComponentModel.Win32Exception ex)
                     {
                         // 프로세스 접근 권한 없음 또는 프로세스를 찾을 수 없음
-                        Console.WriteLine($"[KILL_PROCESS] Access denied or process not found (PID: {process.Id}): {ex.Message}");
+                        Log($"[KILL_PROCESS] Access denied or process not found (PID: {process.Id}): {ex.Message}");
                     }
                     catch (InvalidOperationException ex)
                     {
                         // 프로세스가 이미 종료됨
-                        Console.WriteLine($"[KILL_PROCESS] Process already terminated (PID: {process.Id}): {ex.Message}");
+                        Log($"[KILL_PROCESS] Process already terminated (PID: {process.Id}): {ex.Message}");
                     }
                     catch (NotSupportedException ex)
                     {
                         // 원격 프로세스이거나 지원되지 않음
-                        Console.WriteLine($"[KILL_PROCESS] Operation not supported (PID: {process.Id}): {ex.Message}");
+                        Log($"[KILL_PROCESS] Operation not supported (PID: {process.Id}): {ex.Message}");
                     }
                     catch (Exception ex)
                     {
                         // 기타 예외
-                        Console.WriteLine($"[KILL_PROCESS] Unexpected error killing process (PID: {process.Id}): {ex.GetType().Name} - {ex.Message}");
+                        Log($"[KILL_PROCESS] Unexpected error killing process (PID: {process.Id}): {ex.GetType().Name} - {ex.Message}");
                     }
                     finally
                     {
@@ -521,12 +586,12 @@ namespace AppLauncher.Features.VersionManagement
                     }
                 }
 
-                Console.WriteLine($"[KILL_PROCESS] Processed {processes.Length} fonts_install process(es)");
+                Log($"[KILL_PROCESS] Processed {processes.Length} fonts_install process(es)");
             }
             catch (Exception ex)
             {
                 // GetProcessesByName이 실패하는 경우 (매우 드묾)
-                Console.WriteLine($"[KILL_PROCESS] Failed to enumerate processes: {ex.GetType().Name} - {ex.Message}");
+                Log($"[KILL_PROCESS] Failed to enumerate processes: {ex.GetType().Name} - {ex.Message}");
             }
         }
 
@@ -538,12 +603,12 @@ namespace AppLauncher.Features.VersionManagement
             try
             {
                 // Setup 실행 전 fonts_install 프로세스 강제 종료
-                Console.WriteLine("[PRE-INSTALL] Checking for fonts_install processes...");
+                Log("[PRE-INSTALL] Checking for fonts_install processes...");
                 KillFontsInstallProcess();
 
-                Console.WriteLine("=== LabView Installation Start ===");
-                Console.WriteLine($"Start Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                Console.WriteLine($"Setup Path: {setupExePath}");
+                Log("=== LabView Installation Start ===");
+                Log($"Start Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                Log($"Setup Path: {setupExePath}");
 
                 // 로그 파일 경로 생성
                 string programDataPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
@@ -554,7 +619,7 @@ namespace AppLauncher.Features.VersionManagement
                 }
 
                 string logFilePath = Path.Combine(logDir, $"install_log_{DateTime.Now:yyyyMMddHHmmss}.txt");
-                Console.WriteLine($"Log file path: {logFilePath}");
+                Log($"Log file path: {logFilePath}");
 
                 // PowerShell 명령어 구성
                 // ArgumentList 옵션:
@@ -608,11 +673,11 @@ Write-Output ""CleanupComplete""
                 // 설치 전 setting.ini 파일 백업
                 var backupSettingFile = BackupSettingFile();
 
-                _sendStatusResponse("installation_start", "설치 시작");
+                _sendStatusResponse?.Invoke("installation_start", "설치 시작");
                 var psProcess = Process.Start(startInfo);
                 if (psProcess != null)
                 {
-                    Console.WriteLine($"PowerShell process started (PID: {psProcess.Id})");
+                    Log($"PowerShell process started (PID: {psProcess.Id})");
 
                     // ⭐ setup.exe의 PID를 저장할 변수
                     int? setupPid = null;
@@ -637,7 +702,7 @@ Write-Output ""CleanupComplete""
 
                                 if (currentSetupPid.HasValue)
                                 {
-                                    Console.WriteLine($"[MONITOR] Checking fonts_install processes (setup.exe PID: {currentSetupPid.Value})");
+                                    Log($"[MONITOR] Checking fonts_install processes (setup.exe PID: {currentSetupPid.Value})");
                                     KillFontsInstallProcess(currentSetupPid.Value);
                                 }
                                 else
@@ -650,7 +715,7 @@ Write-Output ""CleanupComplete""
                                 break;
                             }
                         }
-                        Console.WriteLine("[MONITOR] fonts_install monitoring stopped");
+                        Log("[MONITOR] fonts_install monitoring stopped");
                     }, monitorCancellation.Token);
 
                     // ⭐ 실시간 출력 읽기 (setup.exe PID 추출 포함)
@@ -663,7 +728,7 @@ Write-Output ""CleanupComplete""
                         var sb = new System.Text.StringBuilder();
                         while (!psProcess.StandardOutput.EndOfStream)
                         {
-                            string line = psProcess.StandardOutput.ReadLine();
+                            string? line = psProcess.StandardOutput.ReadLine();
                             if (line != null)
                             {
                                 sb.AppendLine(line);
@@ -677,7 +742,7 @@ Write-Output ""CleanupComplete""
                                         {
                                             setupPid = pid;
                                         }
-                                        Console.WriteLine($"[SETUP] Setup.exe PID detected: {pid}");
+                                        Log($"[SETUP] Setup.exe PID detected: {pid}");
                                     }
                                 }
                             }
@@ -702,7 +767,7 @@ Write-Output ""CleanupComplete""
 
                     if (!completed)
                     {
-                        Console.WriteLine($"[TIMEOUT] Installation timeout after {timeoutMinutes} minutes");
+                        Log($"[TIMEOUT] Installation timeout after {timeoutMinutes} minutes");
 
                         try
                         {
@@ -715,11 +780,11 @@ Write-Output ""CleanupComplete""
 
                     if (!string.IsNullOrEmpty(error))
                     {
-                        Console.WriteLine($"PowerShell Error:\n{error}");
+                        Log($"PowerShell Error:\n{error}");
                     }
 
                     // ⭐ 출력 파싱
-                    Console.WriteLine($"PowerShell Output:\n{output}");
+                    Log($"PowerShell Output:\n{output}");
 
                     // Exit code 추출
                     int exitCode = 0;
@@ -729,22 +794,22 @@ Write-Output ""CleanupComplete""
                         if (line.StartsWith("ExitCode:"))
                         {
                             int.TryParse(line.Substring("ExitCode:".Length), out exitCode);
-                            Console.WriteLine($"Parsed Exit Code: {exitCode}");
+                            Log($"Parsed Exit Code: {exitCode}");
                         }
                         else if (line == "WaitingCleanup")
                         {
-                            Console.WriteLine("Waiting for cleanup (20 seconds)...");
+                            Log("Waiting for cleanup (20 seconds)...");
                         }
                         else if (line == "CleanupComplete")
                         {
-                            Console.WriteLine("Cleanup wait completed");
+                            Log("Cleanup wait completed");
                         }
                     }
 
-                    Console.WriteLine("=== LabView Installation DONE ===");
+                    Log("=== LabView Installation DONE ===");
 
                     // 설치 완료 후 fonts_install 프로세스 최종 정리
-                    Console.WriteLine("[POST-INSTALL] Final cleanup of fonts_install processes...");
+                    Log("[POST-INSTALL] Final cleanup of fonts_install processes...");
                     int? finalSetupPid;
                     lock (setupPidLock)
                     {
@@ -752,7 +817,7 @@ Write-Output ""CleanupComplete""
                     }
                     if (finalSetupPid.HasValue)
                     {
-                        Console.WriteLine($"[POST-INSTALL] Cleaning up with setup.exe PID: {finalSetupPid.Value}");
+                        Log($"[POST-INSTALL] Cleaning up with setup.exe PID: {finalSetupPid.Value}");
                         KillFontsInstallProcess(finalSetupPid.Value);
                     }
                     else
@@ -762,16 +827,16 @@ Write-Output ""CleanupComplete""
 
                     if (exitCode != 0)
                     {
-                        Console.WriteLine($"[FAILED] Installation failed (Exit Code: {exitCode})");
-                        Console.WriteLine($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                        Log($"[FAILED] Installation failed (Exit Code: {exitCode})");
+                        Log($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                         return;
 
                     }
                     else
                     {
-                        _sendStatusResponse("installation_complete", "설치 완료");
-                        Console.WriteLine($"[SUCCESS] Installation completed");
-                        Console.WriteLine($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                        _sendStatusResponse?.Invoke("installation_complete", "설치 완료");
+                        Log($"[SUCCESS] Installation completed");
+                        Log($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                         RestoreSettingFile(backupSettingFile);
 
                     }
@@ -779,8 +844,8 @@ Write-Output ""CleanupComplete""
                 }
                 else
                 {
-                    Console.WriteLine("[ERROR] Failed to start PowerShell process");
-                    Console.WriteLine($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                    Log("[ERROR] Failed to start PowerShell process");
+                    Log($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                     return;
                 }
 
@@ -795,24 +860,24 @@ Write-Output ""CleanupComplete""
                             Directory.CreateDirectory(versionFileDir);
                         }
                         File.WriteAllText(_config.LocalVersionFile, _command.Version);
-                        Console.WriteLine($"Version file saved: {_command.Version}");
-                        _sendStatusResponse("version_saved", $"버전 파일 저장: {_command.Version}");
+                        Log($"Version file saved: {_command.Version}");
+                        _sendStatusResponse?.Invoke("version_saved", $"버전 파일 저장: {_command.Version}");
                     }
                     catch (Exception versionEx)
                     {
-                        Console.WriteLine($"Failed to save version file: {versionEx.Message}");
-                        _sendStatusResponse("version_save_error", versionEx.Message);
+                        Log($"Failed to save version file: {versionEx.Message}");
+                        _sendStatusResponse?.Invoke("version_save_error", versionEx.Message);
                     }
                 }
 
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[EXCEPTION] {ex.Message}");
-                Console.WriteLine($"Stack Trace:\n{ex.StackTrace}");
-                Console.WriteLine($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                Log($"[EXCEPTION] {ex.Message}");
+                Log($"Stack Trace:\n{ex.StackTrace}");
+                Log($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
 
-                _sendStatusResponse("error", ex.Message);
+                _sendStatusResponse?.Invoke("error", ex.Message);
             }
         }
 
@@ -825,30 +890,30 @@ Write-Output ""CleanupComplete""
             {
                 var versionInfo = FileVersionInfo.GetVersionInfo(exePath);
 
-                Console.WriteLine("=== Executable 메타데이터 검증 ===");
-                Console.WriteLine($"[METADATA] 파일 경로: {exePath}");
-                Console.WriteLine($"[METADATA] ProductName: {versionInfo.ProductName}");
-                Console.WriteLine($"[METADATA] CompanyName: {versionInfo.CompanyName}");
-                Console.WriteLine($"[METADATA] FileDescription: {versionInfo.FileDescription}");
-                Console.WriteLine($"[METADATA] FileVersion: {versionInfo.FileVersion}");
-                Console.WriteLine($"[METADATA] ProductVersion: {versionInfo.ProductVersion}");
-                Console.WriteLine($"[METADATA] InternalName: {versionInfo.InternalName}");
-                Console.WriteLine($"[METADATA] OriginalFilename: {versionInfo.OriginalFilename}");
-                Console.WriteLine($"[METADATA] LegalCopyright: {versionInfo.LegalCopyright}");
-                Console.WriteLine("============================");
+                Log("=== Executable 메타데이터 검증 ===");
+                Log($"[METADATA] 파일 경로: {exePath}");
+                Log($"[METADATA] ProductName: {versionInfo.ProductName}");
+                Log($"[METADATA] CompanyName: {versionInfo.CompanyName}");
+                Log($"[METADATA] FileDescription: {versionInfo.FileDescription}");
+                Log($"[METADATA] FileVersion: {versionInfo.FileVersion}");
+                Log($"[METADATA] ProductVersion: {versionInfo.ProductVersion}");
+                Log($"[METADATA] InternalName: {versionInfo.InternalName}");
+                Log($"[METADATA] OriginalFilename: {versionInfo.OriginalFilename}");
+                Log($"[METADATA] LegalCopyright: {versionInfo.LegalCopyright}");
+                Log("============================");
 
                 // ProductName과 CompanyName 검증
                 bool productNameMatch = string.Equals(versionInfo.ProductName, expectedProductName, StringComparison.OrdinalIgnoreCase);
                 bool companyNameMatch = string.Equals(versionInfo.CompanyName, expectedCompanyName, StringComparison.OrdinalIgnoreCase);
 
-                Console.WriteLine($"[VALIDATION] Expected ProductName: {expectedProductName}, Actual: {versionInfo.ProductName} -> {(productNameMatch ? "PASS" : "FAIL")}");
-                Console.WriteLine($"[VALIDATION] Expected CompanyName: {expectedCompanyName}, Actual: {versionInfo.CompanyName} -> {(companyNameMatch ? "PASS" : "FAIL")}");
+                Log($"[VALIDATION] Expected ProductName: {expectedProductName}, Actual: {versionInfo.ProductName} -> {(productNameMatch ? "PASS" : "FAIL")}");
+                Log($"[VALIDATION] Expected CompanyName: {expectedCompanyName}, Actual: {versionInfo.CompanyName} -> {(companyNameMatch ? "PASS" : "FAIL")}");
 
                 return productNameMatch && companyNameMatch;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[METADATA] 메타데이터 읽기 실패: {ex.Message}");
+                Log($"[METADATA] 메타데이터 읽기 실패: {ex.Message}");
                 return false;
             }
         }
