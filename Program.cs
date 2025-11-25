@@ -171,11 +171,8 @@ namespace AppLauncher
 #else
             DebugLogger.Log("Program", "Debug 모드 - 자동 설치 스킵");
 #endif
-            var config = ConfigManager.LoadConfig();
 
-            // 서비스 컨테이너 초기화
-            DebugLogger.Log("Main", "ServiceContainer 초기화 중...");
-            ServiceContainer.Initialize(config);
+
 
             const string mutexName = "Global\\AppLauncher_SingleInstance";
             bool createdNew;
@@ -204,6 +201,10 @@ namespace AppLauncher
                 }
                 DebugLogger.Log("Main", "기존 프로세스 종료 성공");
             }
+
+            var config = ConfigManager.LoadConfig();
+            DebugLogger.Log("Main", "ServiceContainer 초기화 중...");
+            ServiceContainer.Initialize(config);
 
             // 작업 스케줄러에 등록되어 있는지 확인
             DebugLogger.Log("Main", "작업 스케줄러 확인...");
@@ -444,30 +445,6 @@ namespace AppLauncher
             }
         }
 
-
-        public static void UnregisterStartup()
-        {
-            try
-            {
-                string appName = "AppLauncher";
-
-                using (RegistryKey? key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
-                {
-                    if (key != null)
-                    {
-                        if (key.GetValue(appName) != null)
-                        {
-                            key.DeleteValue(appName);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"시작프로그램 등록 해제 실패: {ex.Message}", "경고", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
-        }
-
         /// <summary>
         /// 서버에 LabVIEW 업데이트 요청 (파일 없을 때)
         /// MQTT 연결될 때까지 재시도
@@ -524,8 +501,5 @@ namespace AppLauncher
                 DebugLogger.Log("Main", "MQTT 연결 실패. 업데이트 요청을 보낼 수 없습니다.");
             }
         }
-
     }
-
-
 }

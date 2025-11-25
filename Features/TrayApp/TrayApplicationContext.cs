@@ -253,7 +253,9 @@ namespace AppLauncher.Features.TrayApp
                 _notifyIcon.Visible = false;
                 _notifyIcon.Dispose();
                 _notifyIcon = null;
+
             }
+            base.Dispose();
         }
     }
 }
