@@ -17,6 +17,7 @@ namespace AppLauncher.Features.MqttControl
     /// </summary>
     public class MqttMessageHandler
     {
+        private static void Log(string message) => DebugLogger.Log("MQTT", message);
 
         private readonly MqttService _mqttService;
         private readonly LauncherConfig _config;
@@ -35,6 +36,7 @@ namespace AppLauncher.Features.MqttControl
         /// </summary>
         public void SetBalloonTipCallback(Action<string, string, int> callback)
         {
+            // TODO: Implement balloon tip callback functionality  
         }
 
         /// <summary>
@@ -154,37 +156,41 @@ namespace AppLauncher.Features.MqttControl
                 object labviewStatus;
                 Process? hbotProcess = FindHBOTOperatorProcess();
 
-                if (hbotProcess != null && !hbotProcess.HasExited)
+                if (hbotProcess != null)
                 {
-                    hbotProcess.Refresh(); // 최신 정보로 갱신
+                    hbotProcess.Refresh();
 
                     var runningTime = DateTime.Now - hbotProcess.StartTime;
+                    var TotalProcessorTime = hbotProcess.TotalProcessorTime;
                     long memoryMB = hbotProcess.WorkingSet64 / 1024 / 1024;
 
                     labviewStatus = new
                     {
-                        status = "running",
                         processName = hbotProcess.ProcessName,
-                        pid = hbotProcess.Id,
-                        runningTime = $"{runningTime.Hours:D2}:{runningTime.Minutes:D2}:{runningTime.Seconds:D2}",
-                        memoryMB = memoryMB,
+                        status = "running",
                         responding = hbotProcess.Responding,
+                        memoryMB = memoryMB,
                         threadCount = hbotProcess.Threads.Count,
+                        startTime = hbotProcess.StartTime,
+                        runningTime = $"{runningTime.Hours:D2}:{runningTime.Minutes:D2}:{runningTime.Seconds:D2}",
+                        totalProcessorTime = $"{TotalProcessorTime.Hours:D2}:{TotalProcessorTime.Minutes:D2}:{TotalProcessorTime.Seconds:D2}",
                     };
                 }
                 else
                 {
                     labviewStatus = new
                     {
-                        status = "stopped",
                         processName = (string?)null,
-                        pid = (int?)null,
-                        runningTime = (string?)null,
-                        memoryMB = (long?)null,
+                        status = "stopped",
                         responding = (bool?)null,
-                        threadCount = (int?)null
+                        memoryMB = (long?)null,
+                        threadCount = (int?)null,
+                        startTime = (DateTime?)null,
+                        runningTime = (string?)null,
+                        totalProcessorTime = (TimeSpan?)null
                     };
                 }
+
 
                 var status = new
                 {
@@ -208,11 +214,11 @@ namespace AppLauncher.Features.MqttControl
 
                 await _mqttService.PublishJsonAsync(_mqttService.StatusTopic, status);
 
-                DebugLogger.Log($"[MQTT] Status sent ({statusMessage}) - Launcher: {launcherVersion}, App: {targetAppVersion}");
+                Log($"Status sent ({statusMessage}) - Launcher: {launcherVersion}, App: {targetAppVersion}");
             }
             catch (Exception ex)
             {
-                DebugLogger.Log($"[MQTT] Status send error: {ex.Message}");
+                Log($"Status send error: {ex.Message}");
             }
         }
 
@@ -280,36 +286,36 @@ namespace AppLauncher.Features.MqttControl
         {
             try
             {
-                DebugLogger.Log("[MQTT] SETTINGS_UPDATE 명령 수신");
+                Log("SETTINGS_UPDATE 명령 수신");
 
                 // settingContent 확인
                 if (string.IsNullOrEmpty(command.SettingContent))
                 {
-                    DebugLogger.Log("[MQTT] SettingContent가 비어있음");
+                    Log("SettingContent가 비어있음");
                     SendStatusResponse("error", "settingContent is empty");
                     return;
                 }
 
                 string filePath = GetSettingsFilePath();
 
-                DebugLogger.Log($"[MQTT] 파일 경로: {filePath}");
-                DebugLogger.Log($"[MQTT] SettingContent 길이: {command.SettingContent.Length}");
+                Log($"파일 경로: {filePath}");
+                Log($"SettingContent 길이: {command.SettingContent.Length}");
 
                 // 디렉토리 확인
                 string? directory = Path.GetDirectoryName(filePath);
                 if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
                 {
-                    DebugLogger.Log($"[MQTT] 디렉토리 생성: {directory}");
+                    Log($"디렉토리 생성: {directory}");
                     Directory.CreateDirectory(directory);
                 }
 
                 // 파일 쓰기
                 File.WriteAllText(filePath, command.SettingContent);
-                DebugLogger.Log($"[MQTT] setting.ini 업데이트 완료: {filePath}");
+                Log($"setting.ini 업데이트 완료: {filePath}");
 
                 // 저장된 내용 다시 읽어서 확인용으로 전송
                 string savedContent = File.ReadAllText(filePath);
-                DebugLogger.Log($"[MQTT] 저장된 파일 다시 읽기 완료. 길이: {savedContent.Length}");
+                Log($"저장된 파일 다시 읽기 완료. 길이: {savedContent.Length}");
 
                 var response = new
                 {
@@ -319,11 +325,11 @@ namespace AppLauncher.Features.MqttControl
                 };
 
                 await _mqttService.PublishJsonAsync(_mqttService.StatusTopic, response);
-                DebugLogger.Log("[MQTT] 저장된 setting.ini 내용 전송 완료");
+                Log("저장된 setting.ini 내용 전송 완료");
             }
             catch (Exception ex)
             {
-                DebugLogger.Log($"[MQTT] setting.ini 업데이트 오류: {ex.Message}");
+                Log($"setting.ini 업데이트 오류: {ex.Message}");
                 SendStatusResponse("error", ex.Message);
             }
         }
@@ -335,20 +341,20 @@ namespace AppLauncher.Features.MqttControl
         {
             try
             {
-                DebugLogger.Log("[MQTT] SETTINGS_GET 명령 수신");
+                Log("SETTINGS_GET 명령 수신");
 
                 string filePath = GetSettingsFilePath();
-                DebugLogger.Log($"[MQTT] 파일 경로: {filePath}");
+                Log($"파일 경로: {filePath}");
 
                 if (!File.Exists(filePath))
                 {
-                    DebugLogger.Log("[MQTT] setting.ini 파일이 존재하지 않음");
+                    Log("setting.ini 파일이 존재하지 않음");
                     SendStatusResponse("error", $"File not found: {filePath}");
                     return;
                 }
 
                 string content = File.ReadAllText(filePath);
-                DebugLogger.Log($"[MQTT] setting.ini 읽기 완료. 길이: {content.Length}");
+                Log($"setting.ini 읽기 완료. 길이: {content.Length}");
 
                 var response = new
                 {
@@ -358,11 +364,11 @@ namespace AppLauncher.Features.MqttControl
                 };
 
                 await _mqttService.PublishJsonAsync(_mqttService.StatusTopic, response);
-                DebugLogger.Log("[MQTT] setting.ini 내용 전송 완료");
+                Log("setting.ini 내용 전송 완료");
             }
             catch (Exception ex)
             {
-                DebugLogger.Log($"[MQTT] setting.ini 읽기 오류: {ex.Message}");
+                Log($"setting.ini 읽기 오류: {ex.Message}");
                 SendStatusResponse("error", ex.Message);
             }
         }
@@ -488,13 +494,13 @@ namespace AppLauncher.Features.MqttControl
         /// <summary>
         /// LabVIEW 앱이 없거나 오류 발생 시 서버에 업데이트 요청
         /// </summary>
-        public async void RequestLabViewUpdate(string reason)
+        public async Task RequestLabViewUpdate(string reason)
         {
             try
             {
                 if (_mqttService == null || !_mqttService.IsConnected)
                 {
-                    DebugLogger.Log("[MQTT] Cannot request update - MQTT not connected");
+                    Log("Cannot request update - MQTT not connected");
                     return;
                 }
 
@@ -523,11 +529,11 @@ namespace AppLauncher.Features.MqttControl
                 };
                 await _mqttService.PublishJsonAsync(_mqttService.StatusTopic, status);
 
-                DebugLogger.Log($"[MQTT] Update request sent - Reason: {reason}");
+                Log($"Update request sent - Reason: {reason}");
             }
             catch (Exception ex)
             {
-                DebugLogger.Log($"[MQTT] Failed to request update: {ex.Message}");
+                Log($"Failed to request update: {ex.Message}");
             }
         }
 

@@ -10,10 +10,7 @@ namespace AppLauncher.Shared.Services
     /// </summary>
     public static class UninstallSWService
     {
-        private static void Log(string message)
-        {
-            Console.WriteLine($"[Uninstall] {message}");
-        }
+        private static void Log(string message) => DebugLogger.Log("Uninstall", message);
 
         /// <summary>
         /// 프로그램 이름으로 언인스톨 문자열을 찾습니다

@@ -10,6 +10,7 @@ namespace AppLauncher.Features.AppLaunching
 {
     public class ApplicationLauncher
     {
+        private static void Log(string message) => DebugLogger.Log("AppLauncher", message);
 
         private ManagedProcess? _managedProcess = null;
         private readonly object _lock = new object();
@@ -78,7 +79,7 @@ namespace AppLauncher.Features.AppLaunching
             _jobHandle = CreateJobObject(IntPtr.Zero, null);
             if (_jobHandle == IntPtr.Zero)
             {
-                DebugLogger.Log("[ApplicationLauncher] Job Object 생성 실패");
+                Log("Job Object 생성 실패");
                 return;
             }
 
@@ -102,11 +103,11 @@ namespace AppLauncher.Features.AppLaunching
 
             if (result)
             {
-                DebugLogger.Log("[ApplicationLauncher] Job Object 설정 완료 (부모 종료 시 자식도 자동 종료)");
+                Log("Job Object 설정 완료 (부모 종료 시 자식도 자동 종료)");
             }
             else
             {
-                DebugLogger.Log("[ApplicationLauncher] Job Object 설정 실패");
+                Log("Job Object 설정 실패");
             }
         }
 
@@ -196,12 +197,12 @@ namespace AppLauncher.Features.AppLaunching
                         bool assigned = AssignProcessToJobObject(_jobHandle, process.Handle);
                         if (assigned)
                         {
-                            DebugLogger.Log($"[ApplicationLauncher] 프로세스를 Job Object에 할당 완료 (PID: {process.Id})");
-                            DebugLogger.Log("[ApplicationLauncher] AppLauncher 종료 시 자동으로 함께 종료됩니다");
+                            Log($"프로세스를 Job Object에 할당 완료 (PID: {process.Id})");
+                            Log("AppLauncher 종료 시 자동으로 함께 종료됩니다");
                         }
                         else
                         {
-                            DebugLogger.Log($"[ApplicationLauncher] Job Object 할당 실패 (PID: {process.Id})");
+                            Log($"Job Object 할당 실패 (PID: {process.Id})");
                         }
                     }
 
@@ -360,7 +361,7 @@ namespace AppLauncher.Features.AppLaunching
                 // Job Object를 닫으면 자동으로 자식 프로세스도 종료됨
                 if (_jobHandle != IntPtr.Zero)
                 {
-                    DebugLogger.Log("[ApplicationLauncher] Job Object 종료 (모든 자식 프로세스 자동 종료)");
+                    Log("Job Object 종료 (모든 자식 프로세스 자동 종료)");
                     CloseHandle(_jobHandle);
                     _jobHandle = IntPtr.Zero;
                 }
@@ -369,20 +370,20 @@ namespace AppLauncher.Features.AppLaunching
                 {
                     try
                     {
-                        DebugLogger.Log($"[ApplicationLauncher] 프로세스 종료 시도: {_managedProcess.Name} (PID: {_managedProcess.ProcessId})");
+                        Log($"프로세스 종료 시도: {_managedProcess.Name} (PID: {_managedProcess.ProcessId})");
                         _managedProcess.Process.Kill();
                         _managedProcess.Process.WaitForExit(3000); // 3초 대기
-                        DebugLogger.Log($"[ApplicationLauncher] 프로세스 종료 완료");
+                        Log($"프로세스 종료 완료");
                     }
                     catch (Exception ex)
                     {
-                        DebugLogger.Log($"[ApplicationLauncher] 프로세스 종료 실패: {ex.Message}");
+                        Log($"프로세스 종료 실패: {ex.Message}");
                     }
                     _managedProcess = null;
                 }
                 else
                 {
-                    DebugLogger.Log("[ApplicationLauncher] _managedProcess가 null이거나 실행 중이지 않음");
+                    Log("_managedProcess가 null이거나 실행 중이지 않음");
                 }
             }
         }

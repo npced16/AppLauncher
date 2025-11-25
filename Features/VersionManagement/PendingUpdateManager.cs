@@ -11,6 +11,7 @@ namespace AppLauncher.Features.VersionManagement
     /// </summary>
     public static class PendingUpdateManager
     {
+        private static void Log(string message) => DebugLogger.Log("PENDING", message);
 
         private static readonly string PendingUpdateFilePath;
 
@@ -44,12 +45,12 @@ namespace AppLauncher.Features.VersionManagement
                 string json = JsonSerializer.Serialize(command, options);
                 File.WriteAllText(PendingUpdateFilePath, json);
 
-                DebugLogger.Log($"[PENDING] Update scheduled and saved: {PendingUpdateFilePath}");
+                Log($"Update scheduled and saved: {PendingUpdateFilePath}");
                 return true;
             }
             catch (Exception ex)
             {
-                DebugLogger.Log($"[PENDING] Failed to save pending update: {ex.Message}");
+                Log($"Failed to save pending update: {ex.Message}");
                 throw;
             }
         }
@@ -71,7 +72,7 @@ namespace AppLauncher.Features.VersionManagement
                 // 빈 파일이거나 무효화된 파일 처리
                 if (string.IsNullOrWhiteSpace(json) || json.Trim() == "{}")
                 {
-                    DebugLogger.Log($"[PENDING] Pending update file is empty or invalidated, cleaning up");
+                    Log($"Pending update file is empty or invalidated, cleaning up");
                     ClearPendingUpdate();
                     return null;
                 }
@@ -86,17 +87,17 @@ namespace AppLauncher.Features.VersionManagement
                 // 필수 필드가 없으면 무효한 업데이트
                 if (command == null || string.IsNullOrEmpty(command.Version))
                 {
-                    DebugLogger.Log($"[PENDING] Pending update has no valid command, cleaning up");
+                    Log($"Pending update has no valid command, cleaning up");
                     ClearPendingUpdate();
                     return null;
                 }
 
-                DebugLogger.Log($"[PENDING] Update loaded: {PendingUpdateFilePath}");
+                Log($"Update loaded: {PendingUpdateFilePath}");
                 return command;
             }
             catch (Exception ex)
             {
-                DebugLogger.Log($"[PENDING] Failed to load pending update: {ex.Message}");
+                Log($"Failed to load pending update: {ex.Message}");
                 // 파싱 실패 시 파일 정리
                 ClearPendingUpdate();
                 return null;
@@ -110,7 +111,7 @@ namespace AppLauncher.Features.VersionManagement
         {
             if (!File.Exists(PendingUpdateFilePath))
             {
-                DebugLogger.Log($"[PENDING] No pending update file to clear");
+                Log($"No pending update file to clear");
                 return;
             }
 
@@ -124,12 +125,12 @@ namespace AppLauncher.Features.VersionManagement
                     // 파일 속성 초기화 (읽기 전용 해제)
                     File.SetAttributes(PendingUpdateFilePath, FileAttributes.Normal);
                     File.Delete(PendingUpdateFilePath);
-                    DebugLogger.Log($"[PENDING] Pending update cleared: {PendingUpdateFilePath}");
+                    Log($"Pending update cleared: {PendingUpdateFilePath}");
                     return;
                 }
                 catch (Exception ex)
                 {
-                    DebugLogger.Log($"[PENDING] Delete attempt {i + 1}/{maxRetries} failed: {ex.Message}");
+                    Log($"Delete attempt {i + 1}/{maxRetries} failed: {ex.Message}");
 
                     if (i < maxRetries - 1)
                     {
@@ -142,11 +143,11 @@ namespace AppLauncher.Features.VersionManagement
             try
             {
                 File.WriteAllText(PendingUpdateFilePath, "{}");
-                DebugLogger.Log($"[PENDING] Could not delete file, cleared contents instead");
+                Log($"Could not delete file, cleared contents instead");
             }
             catch (Exception ex)
             {
-                DebugLogger.Log($"[PENDING] Failed to clear file contents: {ex.Message}");
+                Log($"Failed to clear file contents: {ex.Message}");
             }
         }
 

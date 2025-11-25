@@ -16,6 +16,8 @@ namespace AppLauncher.Features.TrayApp
 {
     public class TrayApplicationContext : ApplicationContext
     {
+        private static void Log(string message) => DebugLogger.Log("TrayApp", message);
+
         private NotifyIcon? _notifyIcon;
         private MainForm? _mainForm;
         private MqttControlForm? _mqttControlForm;
@@ -25,7 +27,7 @@ namespace AppLauncher.Features.TrayApp
 
         public TrayApplicationContext()
         {
-            DebugLogger.Log("[TrayApplicationContext] InitializeTrayIcon 호출");
+            Log("InitializeTrayIcon 호출");
             InitializeTrayIcon();
         }
 
@@ -149,15 +151,15 @@ namespace AppLauncher.Features.TrayApp
                 }
 
                 // 앱 실행
-                Action<string> statusCallback = status => DebugLogger.Log($"[LAUNCH] {status}");
+                Action<string> statusCallback = status => Log($"[LAUNCH] {status}");
                 await launcher.CheckAndLaunchInBackgroundAsync(config, statusCallback);
 
-                MessageBox.Show(
-                    "앱을 실행했습니다.",
-                    "앱 실행",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information
-                );
+                // MessageBox.Show(
+                //     "앱을 실행했습니다.",
+                //     "앱 실행",
+                //     MessageBoxButtons.OK,
+                //     MessageBoxIcon.Information
+                // );
             }
             catch (Exception ex)
             {

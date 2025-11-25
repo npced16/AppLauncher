@@ -11,6 +11,7 @@ namespace AppLauncher.Features.VersionManagement
 {
     public class LauncherUpdater
     {
+        private static void Log(string message) => DebugLogger.Log("LauncherUpdate", message);
 
         private readonly string _downloadUrl;
 
@@ -30,7 +31,7 @@ namespace AppLauncher.Features.VersionManagement
 
             try
             {
-                DebugLogger.Log($"[UPDATE] 다운로드 시작: {_downloadUrl}");
+                Log($"다운로드 시작: {_downloadUrl}");
 
                 // 임시 파일 경로
                 string tempFile = Path.Combine(Path.GetTempPath(), $"AppLauncher_Update_{Guid.NewGuid()}.exe");
@@ -39,28 +40,28 @@ namespace AppLauncher.Features.VersionManagement
                 bool downloadSuccess = await DownloadFileAsync(_downloadUrl, tempFile);
                 if (!downloadSuccess)
                 {
-                    DebugLogger.Log("[UPDATE] 다운로드 실패");
+                    Log("다운로드 실패");
                     return null;
                 }
 
-                DebugLogger.Log($"[UPDATE] 다운로드 완료: {tempFile}");
+                Log($"다운로드 완료: {tempFile}");
 
                 // 다운로드한 파일 검증
                 if (!ValidateExecutable(tempFile))
                 {
-                    DebugLogger.Log("[UPDATE] 파일 검증 실패 - 같은 프로그램이 아닙니다");
+                    Log("파일 검증 실패 - 같은 프로그램이 아닙니다");
                     File.Delete(tempFile);
                     return null;
                 }
 
-                DebugLogger.Log($"[UPDATE] 파일 교체 시작: {targetExePath}");
+                Log($"파일 교체 시작: {targetExePath}");
 
                 // 목표 디렉토리 생성
                 string? targetDir = Path.GetDirectoryName(targetExePath);
                 if (!string.IsNullOrEmpty(targetDir) && !Directory.Exists(targetDir))
                 {
                     Directory.CreateDirectory(targetDir);
-                    DebugLogger.Log($"[UPDATE] 디렉토리 생성: {targetDir}");
+                    Log($"디렉토리 생성: {targetDir}");
                 }
 
                 // 기존 파일이 있으면 이름 변경 (실행 중인 파일도 이름 변경 가능!)
@@ -71,22 +72,22 @@ namespace AppLauncher.Features.VersionManagement
                         File.Delete(oldPath);
 
                     File.Move(targetExePath, oldPath);
-                    DebugLogger.Log($"[UPDATE] 기존 파일 이름 변경: {oldPath}");
+                    Log($"기존 파일 이름 변경: {oldPath}");
                 }
 
                 // 새 파일 복사
                 File.Copy(tempFile, targetExePath, overwrite: true);
-                DebugLogger.Log($"[UPDATE] 새 파일 복사 완료");
+                Log($"새 파일 복사 완료");
 
                 // 임시 파일 삭제
                 File.Delete(tempFile);
-                DebugLogger.Log($"[UPDATE] 임시 파일 삭제 완료");
+                Log($"임시 파일 삭제 완료");
 
                 return targetExePath;
             }
             catch (Exception ex)
             {
-                DebugLogger.Log($"[UPDATE] 업데이트 실패: {ex.Message}");
+                Log($"업데이트 실패: {ex.Message}");
                 return null;
             }
         }
@@ -133,7 +134,7 @@ namespace AppLauncher.Features.VersionManagement
 
                 if (string.IsNullOrEmpty(currentExePath))
                 {
-                    DebugLogger.Log("[VALIDATE] 현재 실행 파일 경로를 찾을 수 없습니다");
+                    Log("현재 실행 파일 경로를 찾을 수 없습니다");
                     return false;
                 }
 
@@ -145,7 +146,7 @@ namespace AppLauncher.Features.VersionManagement
                 // ProductName 비교 (가장 중요)
                 if (currentVersion.ProductName != downloadedVersion.ProductName)
                 {
-                    DebugLogger.Log($"[VALIDATE] ProductName 불일치: '{currentVersion.ProductName}' != '{downloadedVersion.ProductName}'");
+                    Log($"ProductName 불일치: '{currentVersion.ProductName}' != '{downloadedVersion.ProductName}'");
                     return false;
                 }
 
@@ -154,16 +155,16 @@ namespace AppLauncher.Features.VersionManagement
                     !string.IsNullOrEmpty(downloadedVersion.InternalName) &&
                     currentVersion.InternalName != downloadedVersion.InternalName)
                 {
-                    DebugLogger.Log($"[VALIDATE] InternalName 불일치: '{currentVersion.InternalName}' != '{downloadedVersion.InternalName}'");
+                    Log($"InternalName 불일치: '{currentVersion.InternalName}' != '{downloadedVersion.InternalName}'");
                     return false;
                 }
 
-                DebugLogger.Log("[VALIDATE] 검증 성공 - 같은 프로그램입니다");
+                Log("검증 성공 - 같은 프로그램입니다");
                 return true;
             }
             catch (Exception ex)
             {
-                DebugLogger.Log($"[VALIDATE] 검증 중 오류: {ex.Message}");
+                Log($"검증 중 오류: {ex.Message}");
                 return false;
             }
         }
