@@ -395,6 +395,15 @@ namespace AppLauncher.Features.MqttControl
 
                 ConfigManager.SaveConfig(config);
 
+                // 런타임 설정도 동일하게 반영
+                if (_config.MqttSettings == null)
+                {
+                    _config.MqttSettings = config.MqttSettings;
+                }
+                else
+                {
+                    _config.MqttSettings.Location = command.Location;
+                }
                 SendStatusResponse("location_changed", $"Location changed from '{oldLocation}' to '{command.Location}'");
             }
             catch (Exception ex)

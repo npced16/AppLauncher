@@ -316,7 +316,14 @@ namespace AppLauncher
                             {
                                 DebugLogger.Log("Main", $"백그라운드 프로그램 시작 오류: {ex.Message}");
                                 DebugLogger.Log("Main", "서버에 업데이트 요청...");
-                                await RequestUpdateCall();
+                                try
+                                {
+                                    await RequestUpdateCall();
+                                }
+                                catch (Exception reqEx)
+                                {
+                                    DebugLogger.Log("Main", $"업데이트 요청 실패: {reqEx.Message}");
+                                }
                             }
                         });
                     }

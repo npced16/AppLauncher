@@ -22,7 +22,6 @@ namespace AppLauncher.Features.TrayApp
         private MainForm? _mainForm;
         private MqttControlForm? _mqttControlForm;
         private LauncherSettingsForm? _launcherSettingsForm;
-        private MqttMessageHandler _mqttMessageHandler => ServiceContainer.MqttMessageHandler!;
         private LauncherConfig? _config;
 
         public TrayApplicationContext()
