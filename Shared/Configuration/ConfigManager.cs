@@ -98,6 +98,8 @@ namespace AppLauncher.Shared.Configuration
             {
                 TargetExecutable = @"C:\Program Files (x86)\HBOT Operator\HBOT Operator.exe",
                 WorkingDirectory = "", // 비워두면 실행 파일 디렉토리를 자동으로 사용
+                DownloadDirectory = Path.Combine(programDataPath, AppName, "Downloads"), // 다운로드 디렉토리
+                LogDirectory = Path.Combine(programDataPath, AppName, "Logs"), // 로그 디렉토리
                 LocalVersionFile = Path.Combine(appFolder, "labview_version.txt"),  // LabView 버전
                 LauncherVersionFile = Path.Combine(appFolder, "launcher_version.txt"),  // 런처 버전
                 MqttSettings = new MqttSettings
@@ -123,6 +125,17 @@ namespace AppLauncher.Shared.Configuration
         [JsonProperty("workingDirectory")]
         public string? WorkingDirectory { get; set; }
 
+        /// <summary>
+        /// 다운로드 디렉토리 (선택사항, 비워두면 기본 경로 사용)
+        /// </summary>
+        [JsonProperty("downloadDirectory")]
+        public string? DownloadDirectory { get; set; }
+
+        /// <summary>
+        /// 로그 디렉토리 (선택사항, 비워두면 기본 경로 사용)
+        /// </summary>
+        [JsonProperty("logDirectory")]
+        public string? LogDirectory { get; set; }
 
         /// <summary>
         /// LabView/대상 앱 버전 파일 경로 (labview_version.txt)

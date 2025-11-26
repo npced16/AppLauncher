@@ -123,9 +123,19 @@ namespace AppLauncher.Features.MqttControl
                 _statusCallback("파일 다운로드 중...");
                 _installStatusCallback?.Invoke("다운로드 중");
 
-                // 다운로드 디렉토리 생성 (C:\ProgramData\AppLauncher\Downloads)
-                string programDataPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-                string tempDir = Path.Combine(programDataPath, "AppLauncher", "Downloads");
+                // 다운로드 디렉토리 가져오기 (설정에서 가져오거나 기본값 사용)
+                string tempDir;
+                if (!string.IsNullOrEmpty(_config.DownloadDirectory))
+                {
+                    tempDir = _config.DownloadDirectory;
+                }
+                else
+                {
+                    // 기본 경로: C:\ProgramData\AppLauncher\Downloads
+                    string programDataPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+                    tempDir = Path.Combine(programDataPath, "AppLauncher", "Downloads");
+                }
+
                 if (!Directory.Exists(tempDir))
                     Directory.CreateDirectory(tempDir);
 
@@ -352,9 +362,19 @@ namespace AppLauncher.Features.MqttControl
                 // MQTT: 설치 시작 로그 전송
                 SendStatusResponse("install_start", $"Setup.exe 실행 시작: {setupExePath}");
 
-                // 로그 파일 경로 생성 (C:\ProgramData\AppLauncher\Logs)
-                string programDataPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-                string logDir = Path.Combine(programDataPath, "AppLauncher", "Logs");
+                // 로그 디렉토리 가져오기 (설정에서 가져오거나 기본값 사용)
+                string logDir;
+                if (!string.IsNullOrEmpty(_config.LogDirectory))
+                {
+                    logDir = _config.LogDirectory;
+                }
+                else
+                {
+                    // 기본 경로: C:\ProgramData\AppLauncher\Logs
+                    string programDataPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+                    logDir = Path.Combine(programDataPath, "AppLauncher", "Logs");
+                }
+
                 if (!Directory.Exists(logDir))
                 {
                     Directory.CreateDirectory(logDir);
@@ -373,7 +393,6 @@ Write-Output $proc.Id
                 _statusCallback($"PowerShell로 Setup.exe 실행");
                 SendStatusResponse("install_command", setupExePath);
 
-                // TODO : C 드라이브 밖에서 실행해 볼 것  
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = "powershell.exe",
