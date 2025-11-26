@@ -494,7 +494,8 @@ namespace AppLauncher
             if (mqttService.IsConnected)
             {
                 DebugLogger.Log("Main", "MQTT 연결 완료. 업데이트 요청 전송...");
-                handler.RequestLabViewUpdate("file_not_found");
+                await
+                 handler.RequestLabViewUpdate("file_not_found");
             }
             else
             {

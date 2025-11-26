@@ -19,6 +19,7 @@ namespace AppLauncher.Presentation.WinForms
         private Button saveButton;
         private Button cancelButton;
         private Label versionLabel;
+        private Label targetAppVersionLabel;
 
         public LauncherSettingsForm()
         {
@@ -84,7 +85,7 @@ namespace AppLauncher.Presentation.WinForms
             resetButton = new Button
             {
                 Text = "기본값 초기화",
-                Location = new Point(20, 170),
+                Location = new Point(20, 150),
                 Size = new Size(120, 35)
             };
             resetButton.Click += ResetButton_Click;
@@ -94,7 +95,7 @@ namespace AppLauncher.Presentation.WinForms
             saveButton = new Button
             {
                 Text = "저장",
-                Location = new Point(380, 170),
+                Location = new Point(380, 150),
                 Size = new Size(80, 35)
             };
             saveButton.Click += SaveButton_Click;
@@ -104,7 +105,7 @@ namespace AppLauncher.Presentation.WinForms
             cancelButton = new Button
             {
                 Text = "취소",
-                Location = new Point(480, 170),
+                Location = new Point(480, 150),
                 Size = new Size(80, 35)
             };
             cancelButton.Click += (s, e) => this.Close();
@@ -114,11 +115,21 @@ namespace AppLauncher.Presentation.WinForms
             versionLabel = new Label
             {
                 Text = $"런처 버전: {VersionInfo.LAUNCHER_VERSION}",
-                Location = new Point(20, 220),
-                Size = new Size(200, 20),
+                Location = new Point(20, 200),
+                Size = new Size(300, 20),
                 ForeColor = Color.Gray
             };
             this.Controls.Add(versionLabel);
+
+            // Target App Version Label
+            targetAppVersionLabel = new Label
+            {
+                Text = "챔버 소프트웨어 버전: 로드 중...",
+                Location = new Point(20, 220),
+                Size = new Size(300, 30),
+                ForeColor = Color.Gray
+            };
+            this.Controls.Add(targetAppVersionLabel);
         }
 
         private void LoadSettings()
@@ -130,10 +141,33 @@ namespace AppLauncher.Presentation.WinForms
                 // 현재 설정 표시
                 targetExecutableTextBox.Text = _config.TargetExecutable ?? "";
                 locationTextBox.Text = _config.MqttSettings?.Location ?? "";
+
+                // 챔버 소프트웨어 버전 로드
+                LoadTargetAppVersion();
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"설정 로드 실패: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void LoadTargetAppVersion()
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(_config.LocalVersionFile) && File.Exists(_config.LocalVersionFile))
+                {
+                    string version = File.ReadAllText(_config.LocalVersionFile).Trim();
+                    targetAppVersionLabel.Text = $"챔버 소프트웨어 버전: {version}";
+                }
+                else
+                {
+                    targetAppVersionLabel.Text = "챔버 소프트웨어 버전: 알 수 없음";
+                }
+            }
+            catch
+            {
+                targetAppVersionLabel.Text = "챔버 소프트웨어 버전: 로드 실패";
             }
         }
 

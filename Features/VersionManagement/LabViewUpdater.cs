@@ -633,35 +633,38 @@ namespace AppLauncher.Features.VersionManagement
                 //   -PassThru         : 프로세스 객체 반환 (exit code 확인용)
                 //   -Wait             : 설치 완료까지 대기
                 string psCommand = $@"
-# Setup.exe 실행
-$proc = Start-Process '{setupExePath}' -ArgumentList '/q','/AcceptLicenses','yes','/log','{logFilePath}' -Verb RunAs -PassThru
 
-# Setup.exe의 PID 출력
-Write-Output ""SetupPID:$($proc.Id)""
+                $proc = Start-Process '{setupExePath}' -ArgumentList '/q','/AcceptLicenses','yes','/log','{logFilePath}' -Verb RunAs -PassThru
+                $proc.PriorityClass = 'High'
 
-# 설치 완료까지 대기
-$proc.WaitForExit()
+                Write-Output ""SetupPID:$($proc.Id)""
 
-# Exit code 확인
-$exitCode = $proc.ExitCode
-Write-Output ""ExitCode:$exitCode""
+                $proc.WaitForExit()
 
-# Cleanup 대기 시간 20초
-Write-Output ""WaitingCleanup""
-Start-Sleep -Seconds 20
-Write-Output ""CleanupComplete""
-";
+                $exitCode = $proc.ExitCode
+                Write-Output ""ExitCode:$exitCode""
 
-                var bytes = System.Text.Encoding.Unicode.GetBytes(psCommand);
-                var encodedCommand = Convert.ToBase64String(bytes);
+                Start-Sleep -Seconds 60
 
+                Write-Output $proc.Id
+                ";
 
+                // # Setup.exe 실행
+                // $proc = Start - Process '{setupExePath}' - ArgumentList '/q','/AcceptLicenses','yes','/log','{logFilePath}' - Verb RunAs - PassThru
+
+                // # Exit code 확인
+                // $exitCode = $proc.ExitCode
+                // Write - Output ""ExitCode:$exitCode""
+
+                // # Cleanup 대기 시간 20초
+                // Write - Output ""WaitingCleanup""
+                // Start - Sleep - Seconds 20
+                // Write - Output ""CleanupComplete""
 
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = "powershell.exe",
                     Arguments = $"-Command \"{psCommand}\"",
-                    // Arguments = $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedCommand}",
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardOutput = true,
@@ -679,11 +682,11 @@ Write-Output ""CleanupComplete""
                 {
                     Log($"PowerShell process started (PID: {psProcess.Id})");
 
-                    // ⭐ setup.exe의 PID를 저장할 변수
+                    //  setup.exe의 PID를 저장할 변수
                     int? setupPid = null;
                     var setupPidLock = new object();
 
-                    // ⭐ fonts_install 프로세스 모니터링 및 자동 종료 Task
+                    //  fonts_install 프로세스 모니터링 및 자동 종료 Task
                     var monitorCancellation = new System.Threading.CancellationTokenSource();
                     var monitorTask = Task.Run(async () =>
                     {
@@ -718,7 +721,7 @@ Write-Output ""CleanupComplete""
                         Log("[MONITOR] fonts_install monitoring stopped");
                     }, monitorCancellation.Token);
 
-                    // ⭐ 실시간 출력 읽기 (setup.exe PID 추출 포함)
+                    //  실시간 출력 읽기 (setup.exe PID 추출 포함)
                     string output = "";
                     string error = "";
 
@@ -749,15 +752,16 @@ Write-Output ""CleanupComplete""
                         }
                         output = sb.ToString();
                     });
+
                     Task errorTask = Task.Run(() => error = psProcess.StandardError.ReadToEnd());
 
-                    // ⭐ 타임아웃 설정 (25분)
+                    //  타임아웃 설정 (25분)
                     int timeoutMinutes = 25;
                     bool completed = psProcess.WaitForExit(timeoutMinutes * 60 * 1000);
 
                     Task.WaitAll(outputTask, errorTask);
 
-                    // ⭐ 모니터링 Task 종료
+                    //  모니터링 Task 종료
                     monitorCancellation.Cancel();
                     try
                     {
@@ -783,7 +787,7 @@ Write-Output ""CleanupComplete""
                         Log($"PowerShell Error:\n{error}");
                     }
 
-                    // ⭐ 출력 파싱
+                    //  출력 파싱
                     Log($"PowerShell Output:\n{output}");
 
                     // Exit code 추출
@@ -798,7 +802,7 @@ Write-Output ""CleanupComplete""
                         }
                         else if (line == "WaitingCleanup")
                         {
-                            Log("Waiting for cleanup (20 seconds)...");
+                            Log("Waiting for cleanup (60 seconds)...");
                         }
                         else if (line == "CleanupComplete")
                         {
@@ -825,7 +829,8 @@ Write-Output ""CleanupComplete""
                         KillFontsInstallProcess();
                     }
 
-                    if (exitCode != 0)
+                    // Exit Code 확인: 0 (성공) 또는 3010 (성공 - 재부팅 필요)
+                    if (exitCode != 0 && exitCode != 3010)
                     {
                         Log($"[FAILED] Installation failed (Exit Code: {exitCode})");
                         Log($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
@@ -834,8 +839,16 @@ Write-Output ""CleanupComplete""
                     }
                     else
                     {
+                        if (exitCode == 3010)
+                        {
+                            Log($"[SUCCESS] Installation completed (Reboot required)");
+                        }
+                        else
+                        {
+                            Log($"[SUCCESS] Installation completed");
+                        }
+
                         _sendStatusResponse?.Invoke("installation_complete", "설치 완료");
-                        Log($"[SUCCESS] Installation completed");
                         Log($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                         RestoreSettingFile(backupSettingFile);
 
