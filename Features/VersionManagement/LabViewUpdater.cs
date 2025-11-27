@@ -263,7 +263,7 @@ namespace AppLauncher.Features.VersionManagement
                 else
                 {
                     // exe 파일이면 실행
-                    ExecuteProgram(downloadPath);
+                    await ExecuteProgram(downloadPath);
                 }
 
                 return downloadPath;
@@ -347,7 +347,7 @@ namespace AppLauncher.Features.VersionManagement
                     // setup.exe 메타데이터 로그 출력
                     // LogExecutableMetadata(setupExePath);
                     // PowerShell로 setup.exe 실행
-                    ExecuteSetupWithPowerShell(setupExePath);
+                    await ExecuteSetupWithPowerShell(setupExePath);
                 }
                 else
                 {
@@ -363,7 +363,7 @@ namespace AppLauncher.Features.VersionManagement
         /// <summary>
         /// 프로그램 실행
         /// </summary>
-        private void ExecuteProgram(string executable)
+        private async Task ExecuteProgram(string executable)
         {
             try
             {
@@ -372,7 +372,7 @@ namespace AppLauncher.Features.VersionManagement
                 // setup.exe는 PowerShell로 자동 설치 실행
                 if (fileName == "setup.exe")
                 {
-                    ExecuteSetupWithPowerShell(executable);
+                    await ExecuteSetupWithPowerShell(executable);
                     return;
                 }
 
@@ -449,163 +449,15 @@ namespace AppLauncher.Features.VersionManagement
             }
         }
 
-        /// <summary>
-        /// 특정 부모 프로세스의 자식 프로세스 찾기 (WMI 사용)
-        /// </summary>
-        private int[] GetChildProcessIds(int parentProcessId)
-        {
-            try
-            {
-                var childPids = new System.Collections.Generic.List<int>();
-                using (var searcher = new ManagementObjectSearcher($"SELECT ProcessId FROM Win32_Process WHERE ParentProcessId = {parentProcessId}"))
-                {
-                    foreach (ManagementObject obj in searcher.Get())
-                    {
-                        int childPid = Convert.ToInt32(obj["ProcessId"]);
-                        childPids.Add(childPid);
-                    }
-                }
-                return childPids.ToArray();
-            }
-            catch (Exception ex)
-            {
-                Log($"[CHILD_PROCESS] Failed to get child processes for PID {parentProcessId}: {ex.Message}");
-                return new int[0];
-            }
-        }
-
-        /// <summary>
-        /// 특정 프로세스의 모든 자손 프로세스 찾기 (재귀적으로)
-        /// </summary>
-        private int[] GetAllDescendantProcessIds(int parentProcessId)
-        {
-            var descendants = new System.Collections.Generic.List<int>();
-            var directChildren = GetChildProcessIds(parentProcessId);
-
-            foreach (int childPid in directChildren)
-            {
-                descendants.Add(childPid);
-                // 재귀적으로 손자, 증손자... 프로세스도 찾기
-                descendants.AddRange(GetAllDescendantProcessIds(childPid));
-            }
-
-            return descendants.ToArray();
-        }
-
-        /// <summary>
-        /// fonts_install.exe 프로세스 강제 종료
-        /// </summary>
-        /// <param name="parentProcessId">부모 프로세스 ID (지정하면 해당 프로세스의 자식만 종료)</param>
-        private void KillFontsInstallProcess(int? parentProcessId = null)
-        {
-            try
-            {
-                // "fonts_install" 이름의 모든 프로세스 찾기
-                var processes = Process.GetProcessesByName("fonts_install");
-
-                if (processes.Length == 0)
-                {
-                    // 프로세스가 없으면 아무것도 하지 않음 (정상)
-                    return;
-                }
-
-                // 부모 프로세스가 지정된 경우, 해당 부모의 자손 프로세스만 필터링
-                int[]? targetPids = null;
-                if (parentProcessId.HasValue)
-                {
-                    targetPids = GetAllDescendantProcessIds(parentProcessId.Value);
-                    if (targetPids.Length > 0)
-                    {
-                        Log($"[KILL_PROCESS] Found {targetPids.Length} descendant process(es) of PID {parentProcessId.Value}: {string.Join(", ", targetPids)}");
-                    }
-                }
-
-                foreach (var process in processes)
-                {
-                    try
-                    {
-                        // 프로세스가 이미 종료되었는지 확인
-                        if (process.HasExited)
-                        {
-                            Log($"[KILL_PROCESS] Process already exited (PID: {process.Id})");
-                            continue;
-                        }
-
-                        // 부모 프로세스가 지정된 경우, 해당 부모의 자손인지 확인
-                        if (parentProcessId.HasValue && targetPids != null && !targetPids.Contains(process.Id))
-                        {
-                            Log($"[KILL_PROCESS] Skipping fonts_install (PID: {process.Id}) - not a descendant of PID {parentProcessId.Value}");
-                            continue;
-                        }
-
-                        Log($"[KILL_PROCESS] Killing fonts_install process (PID: {process.Id})");
-                        process.Kill();
-
-                        // 프로세스가 종료될 때까지 대기 (최대 3초)
-                        bool exited = process.WaitForExit(3000);
-
-                        if (exited)
-                        {
-                            Log($"[KILL_PROCESS] Process killed successfully (PID: {process.Id})");
-                        }
-                        else
-                        {
-                            Log($"[KILL_PROCESS] Process did not exit within timeout (PID: {process.Id})");
-                        }
-                    }
-                    catch (System.ComponentModel.Win32Exception ex)
-                    {
-                        // 프로세스 접근 권한 없음 또는 프로세스를 찾을 수 없음
-                        Log($"[KILL_PROCESS] Access denied or process not found (PID: {process.Id}): {ex.Message}");
-                    }
-                    catch (InvalidOperationException ex)
-                    {
-                        // 프로세스가 이미 종료됨
-                        Log($"[KILL_PROCESS] Process already terminated (PID: {process.Id}): {ex.Message}");
-                    }
-                    catch (NotSupportedException ex)
-                    {
-                        // 원격 프로세스이거나 지원되지 않음
-                        Log($"[KILL_PROCESS] Operation not supported (PID: {process.Id}): {ex.Message}");
-                    }
-                    catch (Exception ex)
-                    {
-                        // 기타 예외
-                        Log($"[KILL_PROCESS] Unexpected error killing process (PID: {process.Id}): {ex.GetType().Name} - {ex.Message}");
-                    }
-                    finally
-                    {
-                        try
-                        {
-                            process.Dispose();
-                        }
-                        catch
-                        {
-                            // Dispose 실패 무시
-                        }
-                    }
-                }
-
-                Log($"[KILL_PROCESS] Processed {processes.Length} fonts_install process(es)");
-            }
-            catch (Exception ex)
-            {
-                // GetProcessesByName이 실패하는 경우 (매우 드묾)
-                Log($"[KILL_PROCESS] Failed to enumerate processes: {ex.GetType().Name} - {ex.Message}");
-            }
-        }
 
         /// <summary>
         /// setup.exe를 PowerShell로 자동 설치 실행
         /// </summary>
-        private void ExecuteSetupWithPowerShell(string setupExePath)
+        private async Task ExecuteSetupWithPowerShell(string setupExePath)
         {
             try
             {
                 // Setup 실행 전 fonts_install 프로세스 강제 종료
-                Log("[PRE-INSTALL] Checking for fonts_install processes...");
-                KillFontsInstallProcess();
-
                 Log("=== LabView Installation Start ===");
                 Log($"Start Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                 Log($"Setup Path: {setupExePath}");
@@ -633,8 +485,7 @@ namespace AppLauncher.Features.VersionManagement
                 //   -PassThru         : 프로세스 객체 반환 (exit code 확인용)
                 //   -Wait             : 설치 완료까지 대기
                 string psCommand = $@"
-
-                $proc = Start-Process '{setupExePath}' -ArgumentList '/q','/AcceptLicenses','yes','/log','{logFilePath}' -Verb RunAs -PassThru
+                $proc = Start-Process '{setupExePath}' -ArgumentList '/qb!','/AcceptLicenses','yes','/log','{logFilePath}' -Verb RunAs -PassThru
                 $proc.PriorityClass = 'High'
 
                 Write-Output ""SetupPID:$($proc.Id)""
@@ -643,10 +494,6 @@ namespace AppLauncher.Features.VersionManagement
 
                 $exitCode = $proc.ExitCode
                 Write-Output ""ExitCode:$exitCode""
-
-                Start-Sleep -Seconds 60
-
-                Write-Output $proc.Id
                 ";
 
                 // # Setup.exe 실행
@@ -686,7 +533,7 @@ namespace AppLauncher.Features.VersionManagement
                     int? setupPid = null;
                     var setupPidLock = new object();
 
-                    //  fonts_install 프로세스 모니터링 및 자동 종료 Task
+                    // fonts_install 프로세스 모니터링 및 자동 종료 (비동기)
                     var monitorCancellation = new System.Threading.CancellationTokenSource();
                     var monitorTask = Task.Run(async () =>
                     {
@@ -696,22 +543,14 @@ namespace AppLauncher.Features.VersionManagement
                             {
                                 await Task.Delay(2000, monitorCancellation.Token); // 2초마다 체크
 
-                                // setup.exe의 PID를 알고 있으면 그 자식만 종료, 아니면 모든 fonts_install 종료
+                                // setup.exe의 PID를 알고 있으면 그 자식만 종료
                                 int? currentSetupPid;
                                 lock (setupPidLock)
                                 {
                                     currentSetupPid = setupPid;
                                 }
 
-                                if (currentSetupPid.HasValue)
-                                {
-                                    Log($"[MONITOR] Checking fonts_install processes (setup.exe PID: {currentSetupPid.Value})");
-                                    KillFontsInstallProcess(currentSetupPid.Value);
-                                }
-                                else
-                                {
-                                    KillFontsInstallProcess();
-                                }
+                                FontInstallMonitor.KillFontsInstallProcess(currentSetupPid);
                             }
                             catch (TaskCanceledException)
                             {
@@ -721,7 +560,7 @@ namespace AppLauncher.Features.VersionManagement
                         Log("[MONITOR] fonts_install monitoring stopped");
                     }, monitorCancellation.Token);
 
-                    //  실시간 출력 읽기 (setup.exe PID 추출 포함)
+                    // 실시간 출력 읽기
                     string output = "";
                     string error = "";
 
@@ -736,7 +575,7 @@ namespace AppLauncher.Features.VersionManagement
                             {
                                 sb.AppendLine(line);
 
-                                // setup.exe의 PID 추출
+                                // setup.exe의 PID 추출 및 저장
                                 if (line.StartsWith("SetupPID:"))
                                 {
                                     if (int.TryParse(line.Substring("SetupPID:".Length), out int pid))
@@ -755,17 +594,20 @@ namespace AppLauncher.Features.VersionManagement
 
                     Task errorTask = Task.Run(() => error = psProcess.StandardError.ReadToEnd());
 
-                    //  타임아웃 설정 (25분)
-                    int timeoutMinutes = 25;
-                    bool completed = psProcess.WaitForExit(timeoutMinutes * 60 * 1000);
+                    // 타임아웃 설정 (2시간 MAX)
+                    int timeoutMinutes = 120;
 
-                    Task.WaitAll(outputTask, errorTask);
+                    // 비동기로 대기 (UI 스레드 블로킹 방지)
+                    Task processTask = Task.Run(() => psProcess.WaitForExit());
+                    Task allTasks = Task.WhenAll(processTask, outputTask, errorTask);
 
-                    //  모니터링 Task 종료
+                    bool completed = await Task.WhenAny(allTasks, Task.Delay(timeoutMinutes * 60 * 1000)) == allTasks;
+
+                    // 모니터링 Task 종료
                     monitorCancellation.Cancel();
                     try
                     {
-                        monitorTask.Wait(5000); // 최대 5초 대기
+                        await Task.WhenAny(monitorTask, Task.Delay(5000)); // 최대 5초 대기
                     }
                     catch { }
 
@@ -787,7 +629,7 @@ namespace AppLauncher.Features.VersionManagement
                         Log($"PowerShell Error:\n{error}");
                     }
 
-                    //  출력 파싱
+                    // 출력 파싱
                     Log($"PowerShell Output:\n{output}");
 
                     // Exit code 추출
@@ -799,35 +641,11 @@ namespace AppLauncher.Features.VersionManagement
                         {
                             int.TryParse(line.Substring("ExitCode:".Length), out exitCode);
                             Log($"Parsed Exit Code: {exitCode}");
-                        }
-                        else if (line == "WaitingCleanup")
-                        {
-                            Log("Waiting for cleanup (60 seconds)...");
-                        }
-                        else if (line == "CleanupComplete")
-                        {
-                            Log("Cleanup wait completed");
+                            break;
                         }
                     }
 
                     Log("=== LabView Installation DONE ===");
-
-                    // 설치 완료 후 fonts_install 프로세스 최종 정리
-                    Log("[POST-INSTALL] Final cleanup of fonts_install processes...");
-                    int? finalSetupPid;
-                    lock (setupPidLock)
-                    {
-                        finalSetupPid = setupPid;
-                    }
-                    if (finalSetupPid.HasValue)
-                    {
-                        Log($"[POST-INSTALL] Cleaning up with setup.exe PID: {finalSetupPid.Value}");
-                        KillFontsInstallProcess(finalSetupPid.Value);
-                    }
-                    else
-                    {
-                        KillFontsInstallProcess();
-                    }
 
                     // Exit Code 확인: 0 (성공) 또는 3010 (성공 - 재부팅 필요)
                     if (exitCode != 0 && exitCode != 3010)
@@ -835,25 +653,13 @@ namespace AppLauncher.Features.VersionManagement
                         Log($"[FAILED] Installation failed (Exit Code: {exitCode})");
                         Log($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                         return;
-
                     }
                     else
                     {
-                        if (exitCode == 3010)
-                        {
-                            Log($"[SUCCESS] Installation completed (Reboot required)");
-                        }
-                        else
-                        {
-                            Log($"[SUCCESS] Installation completed");
-                        }
-
                         _sendStatusResponse?.Invoke("installation_complete", "설치 완료");
                         Log($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                         RestoreSettingFile(backupSettingFile);
-
                     }
-
                 }
                 else
                 {

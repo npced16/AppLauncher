@@ -13,7 +13,6 @@ namespace AppLauncher.Presentation.WinForms
         private Label brokerLabel;
         private Label portLabel;
         private Label clientIdLabel;
-        private Label locationLabel;
         private Button closeButton;
 
         public MqttSettingsForm()
@@ -25,7 +24,7 @@ namespace AppLauncher.Presentation.WinForms
         private void InitializeComponent()
         {
             this.Text = "MQTT 정보";
-            this.Size = new Size(500, 300);
+            this.Size = new Size(500, 200);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -92,42 +91,12 @@ namespace AppLauncher.Presentation.WinForms
             };
             this.Controls.Add(clientIdLabel);
 
-            // Location Label (Header)
-            var locationHeaderLabel = new Label
-            {
-                Text = "위치:",
-                Location = new Point(20, 120),
-                Size = new Size(120, 20)
-            };
-            this.Controls.Add(locationHeaderLabel);
-
-            // Location Text (Read-only)
-            locationLabel = new Label
-            {
-                Text = "",
-                Location = new Point(150, 120),
-                Size = new Size(300, 20),
-                BorderStyle = BorderStyle.FixedSingle,
-                BackColor = Color.LightGray
-            };
-            this.Controls.Add(locationLabel);
-
-            // Info Label
-            var infoLabel = new Label
-            {
-                Text = "* 위치는 일반 설정 창에서 수정할 수 있습니다.",
-                Location = new Point(20, 160),
-                Size = new Size(450, 40),
-                ForeColor = Color.Gray,
-                Font = new Font(Font.FontFamily, 8)
-            };
-            this.Controls.Add(infoLabel);
 
             // Close Button
             closeButton = new Button
             {
                 Text = "닫기",
-                Location = new Point(370, 210),
+                Location = new Point(370, 120),
                 Size = new Size(80, 35)
             };
             closeButton.Click += (s, e) => this.Close();
@@ -147,8 +116,6 @@ namespace AppLauncher.Presentation.WinForms
                 // 클라이언트 ID (하드웨어 UUID) 표시
                 clientIdLabel.Text = HardwareInfo.GetHardwareUuid();
 
-                // Location 표시 (읽기 전용)
-                locationLabel.Text = _config.MqttSettings.Location ?? "미설정";
             }
             catch (Exception ex)
             {

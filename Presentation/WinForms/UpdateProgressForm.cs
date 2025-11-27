@@ -229,26 +229,12 @@ namespace AppLauncher.Presentation.WinForms
                 if (_updateSuccess)
                 {
                     // 업데이트 성공 시 컴퓨터 재시작
-                    if (InvokeRequired)
-                    {
-                        Invoke(new Action(() => RestartComputer()));
-                    }
-                    else
-                    {
-                        RestartComputer();
-                    }
+                    RestartComputer();
                 }
                 else
                 {
                     // 업데이트 실패 시 기존 프로그램 실행
-                    if (InvokeRequired)
-                    {
-                        Invoke(new Action(() => StartExistingApp()));
-                    }
-                    else
-                    {
-                        StartExistingApp();
-                    }
+                    StartExistingApp();
                 }
             }
         }
@@ -337,6 +323,12 @@ namespace AppLauncher.Presentation.WinForms
 
         private void UpdateStatus(string status)
         {
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(() => UpdateStatus(status)));
+                return;
+            }
+
             statusLabel.Text = status;
 
             // 현재 챔버 소프트웨어 버전 가져오기
