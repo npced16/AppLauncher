@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using AppLauncher.Features.MqttControl;
 using AppLauncher.Shared;
 using AppLauncher.Shared.Configuration;
+using AppLauncher.Shared.Services;
 
 namespace AppLauncher.Features.VersionManagement
 {

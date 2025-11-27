@@ -24,7 +24,6 @@ namespace AppLauncher.Presentation.WinForms
         private Button connectButton;
         private Button disconnectButton;
         private Button reconnectButton;
-        private Button settingsButton;
         private Button clearLogButton;
         private Button closeButton;
 
@@ -111,16 +110,6 @@ namespace AppLauncher.Presentation.WinForms
             };
             reconnectButton.Click += ReconnectButton_Click;
             this.Controls.Add(reconnectButton);
-
-            // Settings Button
-            settingsButton = new Button
-            {
-                Text = "설정",
-                Location = new Point(350, 130),
-                Size = new Size(100, 35)
-            };
-            settingsButton.Click += SettingsButton_Click;
-            this.Controls.Add(settingsButton);
 
             // Log Label
             var logLabel = new Label
@@ -377,32 +366,6 @@ namespace AppLauncher.Presentation.WinForms
             finally
             {
                 reconnectButton.Enabled = true;
-            }
-        }
-
-        private void SettingsButton_Click(object? sender, EventArgs e)
-        {
-            try
-            {
-                var settingsForm = new MqttSettingsForm();
-                settingsForm.ShowDialog(this);
-
-                // 설정이 변경되었을 수 있으므로 다시 로드
-                var config = ConfigManager.LoadConfig();
-                _settings = config.MqttSettings;
-
-                if (_settings != null)
-                {
-                    brokerInfoLabel.Text = $"브로커: {_settings.Broker}:{_settings.Port}";
-                    string clientId = _mqttService?.ClientId ?? HardwareInfo.GetHardwareUuid();
-                    clientIdLabel.Text = $"클라이언트 ID: {clientId}";
-                    topicLabel.Text = $"구독 토픽: device/{clientId}/commands";
-                    AddLog("설정이 업데이트되었습니다. 재연결이 필요할 수 있습니다.");
-                }
-            }
-            catch (Exception ex)
-            {
-                AddLog($"❌ 설정 창 오류: {ex.Message}");
             }
         }
 

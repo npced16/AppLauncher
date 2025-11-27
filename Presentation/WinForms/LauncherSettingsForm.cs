@@ -4,6 +4,7 @@ using System.IO;
 using System.Windows.Forms;
 using AppLauncher.Shared;
 using AppLauncher.Shared.Configuration;
+using AppLauncher.Shared.Services;
 
 namespace AppLauncher.Presentation.WinForms
 {
@@ -18,8 +19,14 @@ namespace AppLauncher.Presentation.WinForms
         private Button resetButton;
         private Button saveButton;
         private Button cancelButton;
+        private Button requestUpdateButton;
         private Label versionLabel;
         private Label targetAppVersionLabel;
+
+        // MQTT 정보
+        private TextBox mqttBrokerTextBox;
+        private Label mqttPortLabel;
+        private Label mqttClientIdLabel;
 
         public LauncherSettingsForm()
         {
@@ -30,7 +37,7 @@ namespace AppLauncher.Presentation.WinForms
         private void InitializeComponent()
         {
             this.Text = "설정";
-            this.Size = new Size(600, 300);
+            this.Size = new Size(600, 400);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -81,11 +88,90 @@ namespace AppLauncher.Presentation.WinForms
             };
             this.Controls.Add(locationTextBox);
 
+            // === MQTT 정보 섹션 ===
+            var mqttSectionLabel = new Label
+            {
+                Text = "MQTT 정보",
+                Location = new Point(20, 150),
+                Size = new Size(540, 20),
+                Font = new Font(Font.FontFamily, 9, FontStyle.Bold),
+                ForeColor = Color.DarkBlue
+            };
+            this.Controls.Add(mqttSectionLabel);
+
+            // MQTT 브로커 주소
+            var mqttBrokerHeaderLabel = new Label
+            {
+                Text = "브로커 주소:",
+                Location = new Point(30, 180),
+                Size = new Size(100, 20)
+            };
+            this.Controls.Add(mqttBrokerHeaderLabel);
+
+            mqttBrokerTextBox = new TextBox
+            {
+                Location = new Point(140, 178),
+                Size = new Size(420, 25),
+                PlaceholderText = "예: localhost 또는 192.168.1.100"
+            };
+            this.Controls.Add(mqttBrokerTextBox);
+
+            // MQTT 포트
+            var mqttPortHeaderLabel = new Label
+            {
+                Text = "포트:",
+                Location = new Point(30, 205),
+                Size = new Size(100, 20)
+            };
+            this.Controls.Add(mqttPortHeaderLabel);
+
+            mqttPortLabel = new Label
+            {
+                Text = "",
+                Location = new Point(140, 205),
+                Size = new Size(100, 20),
+                ForeColor = Color.Gray
+            };
+            this.Controls.Add(mqttPortLabel);
+
+            // MQTT 클라이언트 ID
+            var mqttClientIdHeaderLabel = new Label
+            {
+                Text = "클라이언트 ID:",
+                Location = new Point(30, 230),
+                Size = new Size(100, 20)
+            };
+            this.Controls.Add(mqttClientIdHeaderLabel);
+
+            mqttClientIdLabel = new Label
+            {
+                Text = "",
+                Location = new Point(140, 230),
+                Size = new Size(420, 20),
+                Font = new Font("Consolas", 9),
+                ForeColor = Color.Gray
+            };
+            this.Controls.Add(mqttClientIdLabel);
+
+            // Request Update Button
+            requestUpdateButton = new Button
+            {
+                Text = "SW 업데이트 요청",
+                Location = new Point(150, 260),
+                Size = new Size(120, 35),
+                BackColor = Color.FromArgb(215, 0, 120),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat
+            };
+            requestUpdateButton.FlatAppearance.BorderSize = 0;
+            requestUpdateButton.Click += RequestUpdateButton_Click;
+            this.Controls.Add(requestUpdateButton);
+
             // Reset Button
             resetButton = new Button
             {
                 Text = "기본값 초기화",
-                Location = new Point(20, 150),
+                Location = new Point(20, 260),
                 Size = new Size(120, 35)
             };
             resetButton.Click += ResetButton_Click;
@@ -95,9 +181,13 @@ namespace AppLauncher.Presentation.WinForms
             saveButton = new Button
             {
                 Text = "저장",
-                Location = new Point(380, 150),
-                Size = new Size(80, 35)
+                Location = new Point(380, 260),
+                Size = new Size(80, 35),
+                BackColor = Color.FromArgb(0, 120, 215),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat
             };
+
             saveButton.Click += SaveButton_Click;
             this.Controls.Add(saveButton);
 
@@ -105,28 +195,45 @@ namespace AppLauncher.Presentation.WinForms
             cancelButton = new Button
             {
                 Text = "취소",
-                Location = new Point(480, 150),
+                Location = new Point(480, 260),
                 Size = new Size(80, 35)
             };
             cancelButton.Click += (s, e) => this.Close();
             this.Controls.Add(cancelButton);
 
-            // Version Label
+            // Version Section
+            var versionHeaderLabel = new Label
+            {
+                Text = "런처 버전:",
+                Location = new Point(20, 310),
+                Size = new Size(80, 20),
+                ForeColor = Color.Gray
+            };
+            this.Controls.Add(versionHeaderLabel);
+
             versionLabel = new Label
             {
-                Text = $"런처 버전: {VersionInfo.LAUNCHER_VERSION}",
-                Location = new Point(20, 200),
-                Size = new Size(300, 20),
+                Text = $"{VersionInfo.LAUNCHER_VERSION}",
+                Location = new Point(100, 310),
+                Size = new Size(50, 20),
                 ForeColor = Color.Gray
             };
             this.Controls.Add(versionLabel);
 
-            // Target App Version Label
+            var targetAppHeaderLabel = new Label
+            {
+                Text = "챔버 소프트웨어 버전:",
+                Location = new Point(160, 310),
+                Size = new Size(120, 20),
+                ForeColor = Color.Gray
+            };
+            this.Controls.Add(targetAppHeaderLabel);
+
             targetAppVersionLabel = new Label
             {
-                Text = "챔버 소프트웨어 버전: 로드 중...",
-                Location = new Point(20, 220),
-                Size = new Size(300, 30),
+                Text = "로드 중...",
+                Location = new Point(310, 310),
+                Size = new Size(50, 20),
                 ForeColor = Color.Gray
             };
             this.Controls.Add(targetAppVersionLabel);
@@ -141,6 +248,11 @@ namespace AppLauncher.Presentation.WinForms
                 // 현재 설정 표시
                 targetExecutableTextBox.Text = _config.TargetExecutable ?? "";
                 locationTextBox.Text = _config.MqttSettings?.Location ?? "";
+
+                // MQTT 정보 표시
+                mqttBrokerTextBox.Text = _config.MqttSettings?.Broker ?? "localhost";
+                mqttPortLabel.Text = _config.MqttSettings?.Port.ToString() ?? "1883";
+                mqttClientIdLabel.Text = HardwareInfo.GetHardwareUuid();
 
                 // 챔버 소프트웨어 버전 로드
                 LoadTargetAppVersion();
@@ -158,16 +270,16 @@ namespace AppLauncher.Presentation.WinForms
                 if (!string.IsNullOrEmpty(_config.LocalVersionFile) && File.Exists(_config.LocalVersionFile))
                 {
                     string version = File.ReadAllText(_config.LocalVersionFile).Trim();
-                    targetAppVersionLabel.Text = $"챔버 소프트웨어 버전: {version}";
+                    targetAppVersionLabel.Text = version;
                 }
                 else
                 {
-                    targetAppVersionLabel.Text = "챔버 소프트웨어 버전: 알 수 없음";
+                    targetAppVersionLabel.Text = "알 수 없음";
                 }
             }
             catch
             {
-                targetAppVersionLabel.Text = "챔버 소프트웨어 버전: 로드 실패";
+                targetAppVersionLabel.Text = "로드 실패";
             }
         }
 
@@ -216,8 +328,9 @@ namespace AppLauncher.Presentation.WinForms
                 // 설정 저장
                 _config.TargetExecutable = targetExecutableTextBox.Text.Trim();
 
-                // MQTT Location 설정 저장
+                // MQTT 설정 저장
                 _config.MqttSettings.Location = string.IsNullOrWhiteSpace(locationTextBox.Text) ? null : locationTextBox.Text.Trim();
+                _config.MqttSettings.Broker = string.IsNullOrWhiteSpace(mqttBrokerTextBox.Text) ? "localhost" : mqttBrokerTextBox.Text.Trim();
 
                 ConfigManager.SaveConfig(_config);
 
@@ -254,6 +367,55 @@ namespace AppLauncher.Presentation.WinForms
             catch (Exception ex)
             {
                 MessageBox.Show($"초기화 실패: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private async void RequestUpdateButton_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                // MQTT 연결 확인
+                if (ServiceContainer.MqttMessageHandler == null || ServiceContainer.MqttService == null || !ServiceContainer.MqttService.IsConnected)
+                {
+                    MessageBox.Show(
+                        "MQTT가 연결되지 않았습니다.\nMQTT 제어 센터에서 연결 상태를 확인해주세요.",
+                        "연결 오류",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                    return;
+                }
+
+                var result = MessageBox.Show(
+                    "서버에 챔버 소프트웨어 업데이트를 요청하시겠습니까?",
+                    "업데이트 요청",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question);
+
+                if (result == DialogResult.Yes)
+                {
+                    // 버튼 비활성화
+                    requestUpdateButton.Enabled = false;
+                    requestUpdateButton.Text = "요청 중...";
+
+                    // 업데이트 요청
+                    await ServiceContainer.MqttMessageHandler.RequestLabViewUpdate("사용자 수동 요청");
+
+                    MessageBox.Show(
+                        "업데이트 요청을 전송했습니다.\n서버에서 업데이트 명령을 보낼 때까지 기다려주세요.",
+                        "요청 완료",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+
+                    // 버튼 다시 활성화
+                    requestUpdateButton.Enabled = true;
+                    requestUpdateButton.Text = "업데이트 요청";
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"업데이트 요청 실패: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                requestUpdateButton.Enabled = true;
+                requestUpdateButton.Text = "업데이트 요청";
             }
         }
     }

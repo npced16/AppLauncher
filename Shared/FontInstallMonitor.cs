@@ -6,6 +6,8 @@ using System.Management;
 using System.Threading;
 using AppLauncher.Shared;
 
+namespace AppLauncher.Shared.Services;
+
 public static class FontInstallMonitor
 {
 
