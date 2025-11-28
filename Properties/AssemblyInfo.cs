@@ -8,5 +8,5 @@ using System.Reflection;
 
 // 어셈블리 버전 정보
 // app.manifest 파일의 assemblyIdentity version과 동일하게 유지해야 합니다
-[assembly: AssemblyVersion("1.2.0.5")]
-[assembly: AssemblyFileVersion("1.2.0.5")]
+[assembly: AssemblyVersion("1.2.1.0")]
+[assembly: AssemblyFileVersion("1.2.1.0")]

@@ -28,6 +28,14 @@ namespace AppLauncher.Presentation.WinForms
         private Label mqttPortLabel;
         private Label mqttClientIdLabel;
 
+        // 그룹 박스
+        private GroupBox targetGroupBox;
+        private GroupBox mqttGroupBox;
+        private GroupBox versionGroupBox;
+
+        // 툴팁
+        private ToolTip toolTip;
+
         public LauncherSettingsForm()
         {
             InitializeComponent();
@@ -36,207 +44,302 @@ namespace AppLauncher.Presentation.WinForms
 
         private void InitializeComponent()
         {
-            this.Text = "설정";
-            this.Size = new Size(600, 350);
+            this.Text = "런처 설정";
+            this.Size = new Size(620, 580);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
+            this.BackColor = Color.FromArgb(240, 240, 245);
 
-            // Target Executable Label
+            // 툴팁 초기화
+            toolTip = new ToolTip
+            {
+                AutoPopDelay = 5000,
+                InitialDelay = 300,
+                ReshowDelay = 100,
+                ShowAlways = true
+            };
+
+            int currentY = 20;
+
+            // ==================== 대상 실행 파일 그룹 박스 ====================
+            targetGroupBox = new GroupBox
+            {
+                Text = " 대상 실행 파일 ",
+                Location = new Point(20, currentY),
+                Size = new Size(560, 95),
+                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(0, 51, 102)
+            };
+
             var targetLabel = new Label
             {
-                Text = "대상 실행 파일:",
-                Location = new Point(20, 20),
-                Size = new Size(120, 20)
+                Text = "실행 파일 경로:",
+                Location = new Point(15, 30),
+                Size = new Size(100, 20),
+                Font = new Font("Segoe UI", 9),
+                ForeColor = Color.FromArgb(50, 50, 50)
             };
-            this.Controls.Add(targetLabel);
+            targetGroupBox.Controls.Add(targetLabel);
 
-            // Target Executable TextBox
             targetExecutableTextBox = new TextBox
             {
-                Location = new Point(20, 45),
-                Size = new Size(450, 25)
+                Location = new Point(15, 53),
+                Size = new Size(425, 25),
+                Font = new Font("Segoe UI", 9),
+                BorderStyle = BorderStyle.FixedSingle
             };
-            this.Controls.Add(targetExecutableTextBox);
+            toolTip.SetToolTip(targetExecutableTextBox, "실행할 대상 프로그램의 전체 경로를 입력하세요");
+            targetGroupBox.Controls.Add(targetExecutableTextBox);
 
-            // Browse Executable Button
             browseExecutableButton = new Button
             {
-                Text = "찾아보기",
-                Location = new Point(480, 43),
-                Size = new Size(80, 27)
+                Text = "찾아보기...",
+                Location = new Point(448, 51),
+                Size = new Size(95, 29),
+                Font = new Font("Segoe UI", 9),
+                BackColor = Color.FromArgb(240, 240, 245),
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
             };
+            browseExecutableButton.FlatAppearance.BorderColor = Color.FromArgb(180, 180, 200);
             browseExecutableButton.Click += BrowseExecutableButton_Click;
-            this.Controls.Add(browseExecutableButton);
+            toolTip.SetToolTip(browseExecutableButton, "실행 파일을 선택합니다");
+            targetGroupBox.Controls.Add(browseExecutableButton);
 
-            // === MQTT 정보 섹션 ===
-            var mqttSectionLabel = new Label
+            this.Controls.Add(targetGroupBox);
+            currentY += 110;
+
+            // ==================== MQTT 설정 그룹 박스 ====================
+            mqttGroupBox = new GroupBox
             {
-                Text = "MQTT 정보",
-                Location = new Point(20, 85),
-                Size = new Size(540, 20),
-                Font = new Font(Font.FontFamily, 9, FontStyle.Bold),
-                ForeColor = Color.DarkBlue
+                Text = " MQTT 연결 설정 ",
+                Location = new Point(20, currentY),
+                Size = new Size(560, 200),
+                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(0, 51, 102)
             };
-            this.Controls.Add(mqttSectionLabel);
 
             // MQTT 브로커 주소
-            var mqttBrokerHeaderLabel = new Label
+            var mqttBrokerLabel = new Label
             {
                 Text = "브로커 주소:",
-                Location = new Point(30, 115),
-                Size = new Size(100, 20)
+                Location = new Point(15, 30),
+                Size = new Size(85, 20),
+                Font = new Font("Segoe UI", 9),
+                ForeColor = Color.FromArgb(50, 50, 50)
             };
-            this.Controls.Add(mqttBrokerHeaderLabel);
+            mqttGroupBox.Controls.Add(mqttBrokerLabel);
 
             mqttBrokerTextBox = new TextBox
             {
-                Location = new Point(140, 113),
-                Size = new Size(320, 25), // 기존보다 줄임
-                PlaceholderText = "예: localhost 또는 192.168.1.100"
+                Location = new Point(105, 28),
+                Size = new Size(280, 25),
+                Font = new Font("Segoe UI", 9),
+                PlaceholderText = "예: localhost",
+                BorderStyle = BorderStyle.FixedSingle
             };
-            this.Controls.Add(mqttBrokerTextBox);
+            toolTip.SetToolTip(mqttBrokerTextBox, "MQTT 브로커 서버 주소 (예: localhost, 192.168.1.100)");
+            mqttGroupBox.Controls.Add(mqttBrokerTextBox);
 
-            // 포트 (브로커 주소 오른쪽 배치)
+            // 포트 레이블 및 값
             var mqttPortHeaderLabel = new Label
             {
                 Text = "포트:",
-                Location = new Point(470, 115),
-                Size = new Size(40, 20)
+                Location = new Point(400, 30),
+                Size = new Size(40, 20),
+                Font = new Font("Segoe UI", 9),
+                ForeColor = Color.FromArgb(50, 50, 50)
             };
-            this.Controls.Add(mqttPortHeaderLabel);
+            mqttGroupBox.Controls.Add(mqttPortHeaderLabel);
 
             mqttPortLabel = new Label
             {
-                Text = _config?.MqttSettings?.Port.ToString() ?? "1883",
-                Location = new Point(510, 115),
-                Size = new Size(50, 20),
-                ForeColor = Color.Gray
+                Text = "1883",
+                Location = new Point(445, 30),
+                Size = new Size(100, 20),
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                ForeColor = Color.FromArgb(0, 120, 215)
             };
-            this.Controls.Add(mqttPortLabel);
+            toolTip.SetToolTip(mqttPortLabel, "MQTT 브로커 포트 번호");
+            mqttGroupBox.Controls.Add(mqttPortLabel);
 
-
-            // Location (MQTT)
+            // 위치 정보
             var locationLabel = new Label
             {
-                Text = "위치:",
-                Location = new Point(30, 150),
-                Size = new Size(100, 20)
+                Text = "위치 정보:",
+                Location = new Point(15, 70),
+                Size = new Size(85, 20),
+                Font = new Font("Segoe UI", 9),
+                ForeColor = Color.FromArgb(50, 50, 50)
             };
-            this.Controls.Add(locationLabel);
+            mqttGroupBox.Controls.Add(locationLabel);
 
             locationTextBox = new TextBox
             {
-                Location = new Point(140, 150),
-                Size = new Size(420, 25),
-                PlaceholderText = "예: 원주 본사/101호"
+                Location = new Point(105, 68),
+                Size = new Size(438, 25),
+                Font = new Font("Segoe UI", 9),
+                PlaceholderText = "예: 원주 본사/101호",
+                BorderStyle = BorderStyle.FixedSingle
             };
-            this.Controls.Add(locationTextBox);
+            toolTip.SetToolTip(locationTextBox, "설치 위치를 입력하세요 (선택사항)");
+            mqttGroupBox.Controls.Add(locationTextBox);
 
-            // MQTT 클라이언트 ID
+            // 클라이언트 ID
             var mqttClientIdHeaderLabel = new Label
             {
                 Text = "클라이언트 ID:",
-                Location = new Point(30, 180),
-                Size = new Size(100, 20)
+                Location = new Point(15, 110),
+                Size = new Size(85, 20),
+                Font = new Font("Segoe UI", 9),
+                ForeColor = Color.FromArgb(50, 50, 50)
             };
-            this.Controls.Add(mqttClientIdHeaderLabel);
+            mqttGroupBox.Controls.Add(mqttClientIdHeaderLabel);
 
             mqttClientIdLabel = new Label
             {
                 Text = "",
-                Location = new Point(140, 180),
-                Size = new Size(420, 20),
+                Location = new Point(105, 110),
+                Size = new Size(438, 20),
                 Font = new Font("Consolas", 9),
-                ForeColor = Color.Gray
+                ForeColor = Color.FromArgb(100, 100, 100),
+                AutoEllipsis = true
             };
-            this.Controls.Add(mqttClientIdLabel);
+            toolTip.SetToolTip(mqttClientIdLabel, "하드웨어 기반 고유 식별자 (자동 생성)");
+            mqttGroupBox.Controls.Add(mqttClientIdLabel);
 
-            // Request Update Button
+            // 업데이트 요청 버튼
             requestUpdateButton = new Button
             {
-                Text = "SW 업데이트 요청",
-                Location = new Point(150, 210),
-                Size = new Size(120, 35),
-                BackColor = Color.FromArgb(215, 0, 120),
+                Text = "📥 SW 업데이트 요청",
+                Location = new Point(15, 148),
+                Size = new Size(528, 38),
+                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                BackColor = Color.FromArgb(220, 53, 69),
                 ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
             };
             requestUpdateButton.FlatAppearance.BorderSize = 0;
+            requestUpdateButton.FlatAppearance.MouseOverBackColor = Color.FromArgb(200, 35, 51);
             requestUpdateButton.Click += RequestUpdateButton_Click;
-            this.Controls.Add(requestUpdateButton);
+            toolTip.SetToolTip(requestUpdateButton, "서버에 챔버 소프트웨어 업데이트를 요청합니다");
+            mqttGroupBox.Controls.Add(requestUpdateButton);
 
-            // Reset Button
-            resetButton = new Button
-            {
-                Text = "기본값 초기화",
-                Location = new Point(20, 210),
-                Size = new Size(120, 35)
-            };
-            resetButton.Click += ResetButton_Click;
-            this.Controls.Add(resetButton);
+            this.Controls.Add(mqttGroupBox);
+            currentY += 215;
 
-            // Save Button
-            saveButton = new Button
+            // ==================== 버전 정보 그룹 박스 ====================
+            versionGroupBox = new GroupBox
             {
-                Text = "저장",
-                Location = new Point(380, 210),
-                Size = new Size(80, 35),
-                BackColor = Color.FromArgb(0, 120, 215),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat
+                Text = " 버전 정보 ",
+                Location = new Point(20, currentY),
+                Size = new Size(560, 80),
+                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(0, 51, 102)
             };
 
-            saveButton.Click += SaveButton_Click;
-            this.Controls.Add(saveButton);
-
-            // Cancel Button
-            cancelButton = new Button
-            {
-                Text = "취소",
-                Location = new Point(480, 210),
-                Size = new Size(80, 35)
-            };
-            cancelButton.Click += (s, e) => this.Close();
-            this.Controls.Add(cancelButton);
-
-            // Version Section
             var versionHeaderLabel = new Label
             {
                 Text = "런처 버전:",
-                Location = new Point(20, 250),
-                Size = new Size(70, 20),
-                ForeColor = Color.Gray
+                Location = new Point(15, 30),
+                Size = new Size(80, 20),
+                Font = new Font("Segoe UI", 9),
+                ForeColor = Color.FromArgb(50, 50, 50)
             };
-            this.Controls.Add(versionHeaderLabel);
+            versionGroupBox.Controls.Add(versionHeaderLabel);
 
             versionLabel = new Label
             {
                 Text = $"{VersionInfo.LAUNCHER_VERSION}",
-                Location = new Point(90, 250),
-                Size = new Size(100, 20),
-                ForeColor = Color.Gray
+                Location = new Point(100, 30),
+                Size = new Size(150, 20),
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                ForeColor = Color.FromArgb(0, 120, 215)
             };
-            this.Controls.Add(versionLabel);
+            versionGroupBox.Controls.Add(versionLabel);
 
             var targetAppHeaderLabel = new Label
             {
                 Text = "챔버 SW 버전:",
-                Location = new Point(210, 250),
-                Size = new Size(90, 20),
-                ForeColor = Color.Gray
+                Location = new Point(270, 30),
+                Size = new Size(100, 20),
+                Font = new Font("Segoe UI", 9),
+                ForeColor = Color.FromArgb(50, 50, 50)
             };
-            this.Controls.Add(targetAppHeaderLabel);
+            versionGroupBox.Controls.Add(targetAppHeaderLabel);
 
             targetAppVersionLabel = new Label
             {
                 Text = "로드 중...",
-                Location = new Point(300, 250),
-                Size = new Size(100, 20),
-                ForeColor = Color.Gray
+                Location = new Point(375, 30),
+                Size = new Size(170, 20),
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                ForeColor = Color.FromArgb(0, 120, 215)
             };
-            this.Controls.Add(targetAppVersionLabel);
+            versionGroupBox.Controls.Add(targetAppVersionLabel);
+
+            this.Controls.Add(versionGroupBox);
+            currentY += 95;
+
+            // ==================== 하단 버튼들 ====================
+            var buttonY = currentY + 10;
+
+            // 기본값 초기화 버튼
+            resetButton = new Button
+            {
+                Text = "🔄 기본값 초기화",
+                Location = new Point(20, buttonY),
+                Size = new Size(130, 40),
+                Font = new Font("Segoe UI", 9),
+                BackColor = Color.FromArgb(108, 117, 125),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
+            };
+            resetButton.FlatAppearance.BorderSize = 0;
+            resetButton.FlatAppearance.MouseOverBackColor = Color.FromArgb(90, 98, 104);
+            resetButton.Click += ResetButton_Click;
+            toolTip.SetToolTip(resetButton, "모든 설정을 기본값으로 초기화합니다");
+            this.Controls.Add(resetButton);
+
+            // 취소 버튼
+            cancelButton = new Button
+            {
+                Text = "취소",
+                Location = new Point(390, buttonY),
+                Size = new Size(90, 40),
+                Font = new Font("Segoe UI", 9),
+                BackColor = Color.FromArgb(108, 117, 125),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
+            };
+            cancelButton.FlatAppearance.BorderSize = 0;
+            cancelButton.FlatAppearance.MouseOverBackColor = Color.FromArgb(90, 98, 104);
+            cancelButton.Click += (s, e) => this.Close();
+            toolTip.SetToolTip(cancelButton, "변경사항을 저장하지 않고 닫습니다");
+            this.Controls.Add(cancelButton);
+
+            // 저장 버튼
+            saveButton = new Button
+            {
+                Text = "💾 저장",
+                Location = new Point(490, buttonY),
+                Size = new Size(90, 40),
+                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                BackColor = Color.FromArgb(40, 167, 69),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
+            };
+            saveButton.FlatAppearance.BorderSize = 0;
+            saveButton.FlatAppearance.MouseOverBackColor = Color.FromArgb(33, 136, 56);
+            saveButton.Click += SaveButton_Click;
+            toolTip.SetToolTip(saveButton, "설정을 저장하고 닫습니다");
+            this.Controls.Add(saveButton);
         }
 
         private void LoadSettings()
