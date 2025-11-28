@@ -19,7 +19,6 @@ namespace AppLauncher.Presentation.WinForms
         private Label connectionStatusLabel;
         private Label brokerInfoLabel;
         private Label clientIdLabel;
-        private Label topicLabel;
         private TextBox logTextBox;
         private Button connectButton;
         private Button disconnectButton;
@@ -45,7 +44,7 @@ namespace AppLauncher.Presentation.WinForms
         private void InitializeComponent()
         {
             this.Text = "MQTT 제어 센터";
-            this.Size = new Size(780, 860);
+            this.Size = new Size(780, 750);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -63,12 +62,12 @@ namespace AppLauncher.Presentation.WinForms
 
             int currentY = 20;
 
-            // ==================== 연결 상태 그룹 박스 ====================
+            // ==================== 연결 상태 그룹 박스 (왼쪽) ====================
             statusGroupBox = new GroupBox
             {
                 Text = " 연결 정보 ",
                 Location = new Point(20, currentY),
-                Size = new Size(720, 135),
+                Size = new Size(450, 115),
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(0, 51, 102)
             };
@@ -111,7 +110,7 @@ namespace AppLauncher.Presentation.WinForms
             {
                 Text = "로드 중...",
                 Location = new Point(80, 63),
-                Size = new Size(620, 20),
+                Size = new Size(350, 20),
                 Font = new Font("Segoe UI", 9),
                 ForeColor = Color.FromArgb(0, 120, 215)
             };
@@ -132,44 +131,21 @@ namespace AppLauncher.Presentation.WinForms
             {
                 Text = "로드 중...",
                 Location = new Point(80, 88),
-                Size = new Size(620, 22),
+                Size = new Size(350, 22),
                 Font = new Font("Consolas", 9.5f),
                 ForeColor = Color.FromArgb(100, 100, 100),
                 AutoEllipsis = true
             };
             statusGroupBox.Controls.Add(clientIdLabel);
 
-            // 구독 토픽
-            var topicHeaderLabel = new Label
-            {
-                Text = "토픽:",
-                Location = new Point(15, 113),
-                Size = new Size(60, 22),
-                Font = new Font("Segoe UI", 9.5f),
-                ForeColor = Color.FromArgb(50, 50, 50)
-            };
-            statusGroupBox.Controls.Add(topicHeaderLabel);
-
-            topicLabel = new Label
-            {
-                Text = "로드 중...",
-                Location = new Point(80, 113),
-                Size = new Size(620, 22),
-                Font = new Font("Consolas", 9.5f),
-                ForeColor = Color.FromArgb(100, 100, 100),
-                AutoEllipsis = true
-            };
-            statusGroupBox.Controls.Add(topicLabel);
-
             this.Controls.Add(statusGroupBox);
-            currentY += 150;
 
-            // ==================== 제어 버튼 그룹 박스 ====================
+            // ==================== 제어 버튼 그룹 박스 (오른쪽) ====================
             controlGroupBox = new GroupBox
             {
                 Text = " 연결 제어 ",
-                Location = new Point(20, currentY),
-                Size = new Size(720, 75),
+                Location = new Point(480, currentY),
+                Size = new Size(260, 115),
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(0, 51, 102)
             };
@@ -178,8 +154,8 @@ namespace AppLauncher.Presentation.WinForms
             connectButton = new Button
             {
                 Text = "연결",
-                Location = new Point(15, 28),
-                Size = new Size(115, 35),
+                Location = new Point(15, 25),
+                Size = new Size(230, 25),
                 Font = new Font("Segoe UI", 9, FontStyle.Bold),
                 BackColor = Color.FromArgb(40, 167, 69),
                 ForeColor = Color.White,
@@ -196,8 +172,8 @@ namespace AppLauncher.Presentation.WinForms
             disconnectButton = new Button
             {
                 Text = "연결 해제",
-                Location = new Point(140, 28),
-                Size = new Size(115, 35),
+                Location = new Point(15, 55),
+                Size = new Size(230, 25),
                 Font = new Font("Segoe UI", 9, FontStyle.Bold),
                 BackColor = Color.FromArgb(220, 53, 69),
                 ForeColor = Color.White,
@@ -215,8 +191,8 @@ namespace AppLauncher.Presentation.WinForms
             reconnectButton = new Button
             {
                 Text = "재연결",
-                Location = new Point(265, 28),
-                Size = new Size(115, 35),
+                Location = new Point(15, 85),
+                Size = new Size(230, 25),
                 Font = new Font("Segoe UI", 9, FontStyle.Bold),
                 BackColor = Color.FromArgb(0, 120, 215),
                 ForeColor = Color.White,
@@ -230,7 +206,7 @@ namespace AppLauncher.Presentation.WinForms
             controlGroupBox.Controls.Add(reconnectButton);
 
             this.Controls.Add(controlGroupBox);
-            currentY += 90;
+            currentY += 130;
 
             // ==================== 로그 그룹 박스 ====================
             logGroupBox = new GroupBox
@@ -305,10 +281,9 @@ namespace AppLauncher.Presentation.WinForms
                 var config = ConfigManager.LoadConfig();
                 _settings = config.MqttSettings;
 
-                brokerInfoLabel.Text = $"브로커: {_settings.Broker}:{_settings.Port}";
+                brokerInfoLabel.Text = $"{_settings.Broker}:{_settings.Port}";
                 string clientId = _mqttService.ClientId;
                 clientIdLabel.Text = $"{clientId}";
-                topicLabel.Text = $"device/{clientId}/commands";
 
                 // 전역 MQTT 서비스에 연결
                 AttachToExistingService();
@@ -477,10 +452,7 @@ namespace AppLauncher.Presentation.WinForms
             {
                 AddLog($"❌ 연결 해제 오류: {ex.Message}");
             }
-            finally
-            {
-                disconnectButton.Enabled = true;
-            }
+
         }
 
         private async void ReconnectButton_Click(object? sender, EventArgs e)

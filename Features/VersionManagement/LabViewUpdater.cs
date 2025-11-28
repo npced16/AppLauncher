@@ -327,10 +327,12 @@ namespace AppLauncher.Features.VersionManagement
                         _sendStatusResponse?.Invoke("validation_failed", "파일 검증 실패 - 파일 실행");
 
                         // 검증 실패 시 HBOT Operator.exe 실행
-                        if (Path.GetDirectoryName(_config.TargetExecutable) != null)
+                        var targetExe = _config.TargetExecutable;
+                        if (!string.IsNullOrEmpty(targetExe) && File.Exists(targetExe))
                         {
-                            await ExecuteProgram(Path.GetDirectoryName(_config.TargetExecutable));
+                            await ExecuteProgram(targetExe);
                         }
+
                         return;
                     }
                     Log($"[ZIP] HBOT Operator.exe validation successful - proceeding with setup.exe");

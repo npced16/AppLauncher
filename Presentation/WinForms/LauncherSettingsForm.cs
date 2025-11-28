@@ -213,7 +213,7 @@ namespace AppLauncher.Presentation.WinForms
             // 업데이트 요청 버튼
             requestUpdateButton = new Button
             {
-                Text = "📥 SW 업데이트 요청",
+                Text = "SW 업데이트 요청",
                 Location = new Point(15, 148),
                 Size = new Size(528, 38),
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
