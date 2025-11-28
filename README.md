@@ -17,22 +17,23 @@ AppLauncher/
 │   └── VersionManagement/
 │       ├── LabViewUpdater.cs           # 챔버 소프트웨어 업데이트
 │       ├── LauncherUpdater.cs          # 런처 자체 업데이트
-│       ├── PendingUpdate.cs            # 업데이트 정보 모델
 │       └── PendingUpdateManager.cs     # 업데이트 예약 관리
 ├── Presentation/                       # UI 레이어
 │   └── WinForms/
 │       ├── MqttControlForm.cs          # MQTT 제어 창
-│       ├── MqttSettingsForm.cs         # MQTT 설정 창
-│       ├── LauncherSettingsForm.cs     # 런처 설정 창
+│       ├── LauncherSettingsForm.cs     # 런처 설정 창 (MQTT 정보 포함)
 │       ├── UpdateProgressForm.cs       # 업데이트 진행 화면 (전체화면)
 │       └── MainForm.cs                 # 메인 폼
 ├── Shared/                             # 공통 유틸리티
 │   ├── Configuration/
 │   │   └── ConfigManager.cs            # 설정 파일 관리
 │   ├── Logger/
+│   │   ├── DebugLogger.cs              # 디버그 로깅
 │   │   └── FileLogger.cs               # MQTT 로그 파일 관리
 │   ├── Services/
-│   │   └── ServiceContainer.cs         # 전역 서비스 컨테이너
+│   │   ├── ServiceContainer.cs         # 전역 서비스 컨테이너
+│   │   ├── FontInstallMonitor.cs       # fonts_install 프로세스 모니터링
+│   │   └── UninstallSWService.cs       # 소프트웨어 제거 서비스
 │   ├── HardwareInfo.cs                 # 하드웨어 정보 수집
 │   ├── TaskSchedulerManager.cs         # 작업 스케줄러 관리
 │   └── VersionInfo.cs                  # 버전 정보 관리
