@@ -663,6 +663,27 @@ namespace AppLauncher.Features.VersionManagement
                         _sendStatusResponse?.Invoke("installation_complete", "설치 완료");
                         Log($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                         RestoreSettingFile(backupSettingFile);
+
+                        // 버전 정보 저장 (설치 성공 시에만)
+                        if (!string.IsNullOrEmpty(_command.Version) && !string.IsNullOrEmpty(_config.LocalVersionFile))
+                        {
+                            try
+                            {
+                                string? versionFileDir = Path.GetDirectoryName(_config.LocalVersionFile);
+                                if (!string.IsNullOrEmpty(versionFileDir) && !Directory.Exists(versionFileDir))
+                                {
+                                    Directory.CreateDirectory(versionFileDir);
+                                }
+                                File.WriteAllText(_config.LocalVersionFile, _command.Version);
+                                Log($"Version file saved: {_command.Version}");
+                                _sendStatusResponse?.Invoke("version_saved", $"버전 파일 저장: {_command.Version}");
+                            }
+                            catch (Exception versionEx)
+                            {
+                                Log($"Failed to save version file: {versionEx.Message}");
+                                _sendStatusResponse?.Invoke("version_save_error", versionEx.Message);
+                            }
+                        }
                     }
                 }
                 else
@@ -670,27 +691,6 @@ namespace AppLauncher.Features.VersionManagement
                     Log("[ERROR] Failed to start PowerShell process");
                     Log($"End Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                     return;
-                }
-
-                // 버전 정보 저장
-                if (!string.IsNullOrEmpty(_command.Version) && !string.IsNullOrEmpty(_config.LocalVersionFile))
-                {
-                    try
-                    {
-                        string? versionFileDir = Path.GetDirectoryName(_config.LocalVersionFile);
-                        if (!string.IsNullOrEmpty(versionFileDir) && !Directory.Exists(versionFileDir))
-                        {
-                            Directory.CreateDirectory(versionFileDir);
-                        }
-                        File.WriteAllText(_config.LocalVersionFile, _command.Version);
-                        Log($"Version file saved: {_command.Version}");
-                        _sendStatusResponse?.Invoke("version_saved", $"버전 파일 저장: {_command.Version}");
-                    }
-                    catch (Exception versionEx)
-                    {
-                        Log($"Failed to save version file: {versionEx.Message}");
-                        _sendStatusResponse?.Invoke("version_save_error", versionEx.Message);
-                    }
                 }
 
             }
