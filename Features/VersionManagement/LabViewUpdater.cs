@@ -595,8 +595,8 @@ namespace AppLauncher.Features.VersionManagement
 
                     Task errorTask = Task.Run(() => error = psProcess.StandardError.ReadToEnd());
 
-                    // 타임아웃 설정 (2시간 MAX)
-                    int timeoutMinutes = 120;
+                    // 타임아웃 설정 (3시간 MAX)
+                    int timeoutMinutes = 180;
 
                     // 비동기로 대기 (UI 스레드 블로킹 방지)
                     Task processTask = Task.Run(() => psProcess.WaitForExit());

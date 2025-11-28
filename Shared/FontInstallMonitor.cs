@@ -23,11 +23,11 @@ public static class FontInstallMonitor
       var childPids = new System.Collections.Generic.List<int>();
       using (var searcher = new ManagementObjectSearcher($"SELECT ProcessId FROM Win32_Process WHERE ParentProcessId = {parentProcessId}"))
       {
-        foreach (ManagementObject obj in searcher.Get())
-        {
-          int childPid = Convert.ToInt32(obj["ProcessId"]);
-          childPids.Add(childPid);
-        }
+        foreach (ManagementObject obj in searcher.Get()) using (obj)
+          {
+            int childPid = Convert.ToInt32(obj["ProcessId"]);
+            childPids.Add(childPid);
+          }
       }
       return childPids.ToArray();
     }
@@ -167,7 +167,7 @@ public static class FontInstallMonitor
     int idleCount = 0;
     int idleThreshold = 50; // 0.1초 * 50 = 5초
 
-    Console.WriteLine("Monitoring   .exe...");
+    Log("Starting fonts_install monitor...");
 
     while (true)
     {
@@ -189,7 +189,7 @@ public static class FontInstallMonitor
 
       if (idleCount >= idleThreshold)
       {
-        Console.WriteLine("[IDLE / TERMINATING PROCESS TREE]");
+        Log("fonts_install process is idle. Terminating...");
         KillFontsInstallProcess(process.Id);
         break;
       }
@@ -198,6 +198,7 @@ public static class FontInstallMonitor
       Thread.Sleep(100);
     }
 
-    Console.WriteLine("Monitoring ended.");
+
+    Log("Font install monitor exited.");
   }
 }

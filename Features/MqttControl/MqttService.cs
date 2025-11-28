@@ -209,7 +209,7 @@ namespace AppLauncher.Features.MqttControl
             {
                 var jsonObj = JsonConvert.DeserializeObject(payload);
                 string formattedJson = JsonConvert.SerializeObject(jsonObj, Formatting.Indented);
-                LogMessage?.Invoke($"  내용 (JSON):\n{formattedJson}");
+                LogMessage?.Invoke(formattedJson);
             }
             catch
             {
@@ -252,7 +252,7 @@ namespace AppLauncher.Features.MqttControl
                 {
                     var jsonObj = JsonConvert.DeserializeObject(payload);
                     string formattedJson = JsonConvert.SerializeObject(jsonObj, Formatting.Indented);
-                    LogMessage?.Invoke($"  내용:\n{formattedJson}");
+                    LogMessage?.Invoke(formattedJson);
                 }
                 catch
                 {

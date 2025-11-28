@@ -37,7 +37,7 @@ namespace AppLauncher.Presentation.WinForms
         private void InitializeComponent()
         {
             this.Text = "설정";
-            this.Size = new Size(600, 400);
+            this.Size = new Size(600, 350);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -70,29 +70,11 @@ namespace AppLauncher.Presentation.WinForms
             browseExecutableButton.Click += BrowseExecutableButton_Click;
             this.Controls.Add(browseExecutableButton);
 
-            // Location Label
-            var locationLabel = new Label
-            {
-                Text = "위치 (MQTT):",
-                Location = new Point(20, 85),
-                Size = new Size(120, 20)
-            };
-            this.Controls.Add(locationLabel);
-
-            // Location TextBox
-            locationTextBox = new TextBox
-            {
-                Location = new Point(20, 110),
-                Size = new Size(540, 25),
-                PlaceholderText = "예: 원주 본사/101호"
-            };
-            this.Controls.Add(locationTextBox);
-
             // === MQTT 정보 섹션 ===
             var mqttSectionLabel = new Label
             {
                 Text = "MQTT 정보",
-                Location = new Point(20, 150),
+                Location = new Point(20, 85),
                 Size = new Size(540, 20),
                 Font = new Font(Font.FontFamily, 9, FontStyle.Bold),
                 ForeColor = Color.DarkBlue
@@ -103,42 +85,60 @@ namespace AppLauncher.Presentation.WinForms
             var mqttBrokerHeaderLabel = new Label
             {
                 Text = "브로커 주소:",
-                Location = new Point(30, 180),
+                Location = new Point(30, 115),
                 Size = new Size(100, 20)
             };
             this.Controls.Add(mqttBrokerHeaderLabel);
 
             mqttBrokerTextBox = new TextBox
             {
-                Location = new Point(140, 178),
-                Size = new Size(420, 25),
+                Location = new Point(140, 113),
+                Size = new Size(320, 25), // 기존보다 줄임
                 PlaceholderText = "예: localhost 또는 192.168.1.100"
             };
             this.Controls.Add(mqttBrokerTextBox);
 
-            // MQTT 포트
+            // 포트 (브로커 주소 오른쪽 배치)
             var mqttPortHeaderLabel = new Label
             {
                 Text = "포트:",
-                Location = new Point(30, 205),
-                Size = new Size(100, 20)
+                Location = new Point(470, 115),
+                Size = new Size(40, 20)
             };
             this.Controls.Add(mqttPortHeaderLabel);
 
             mqttPortLabel = new Label
             {
-                Text = "",
-                Location = new Point(140, 205),
-                Size = new Size(100, 20),
+                Text = _config?.MqttSettings?.Port.ToString() ?? "1883",
+                Location = new Point(510, 115),
+                Size = new Size(50, 20),
                 ForeColor = Color.Gray
             };
             this.Controls.Add(mqttPortLabel);
+
+
+            // Location (MQTT)
+            var locationLabel = new Label
+            {
+                Text = "위치:",
+                Location = new Point(30, 150),
+                Size = new Size(100, 20)
+            };
+            this.Controls.Add(locationLabel);
+
+            locationTextBox = new TextBox
+            {
+                Location = new Point(140, 150),
+                Size = new Size(420, 25),
+                PlaceholderText = "예: 원주 본사/101호"
+            };
+            this.Controls.Add(locationTextBox);
 
             // MQTT 클라이언트 ID
             var mqttClientIdHeaderLabel = new Label
             {
                 Text = "클라이언트 ID:",
-                Location = new Point(30, 230),
+                Location = new Point(30, 180),
                 Size = new Size(100, 20)
             };
             this.Controls.Add(mqttClientIdHeaderLabel);
@@ -146,7 +146,7 @@ namespace AppLauncher.Presentation.WinForms
             mqttClientIdLabel = new Label
             {
                 Text = "",
-                Location = new Point(140, 230),
+                Location = new Point(140, 180),
                 Size = new Size(420, 20),
                 Font = new Font("Consolas", 9),
                 ForeColor = Color.Gray
@@ -157,7 +157,7 @@ namespace AppLauncher.Presentation.WinForms
             requestUpdateButton = new Button
             {
                 Text = "SW 업데이트 요청",
-                Location = new Point(150, 260),
+                Location = new Point(150, 210),
                 Size = new Size(120, 35),
                 BackColor = Color.FromArgb(215, 0, 120),
                 ForeColor = Color.White,
@@ -171,7 +171,7 @@ namespace AppLauncher.Presentation.WinForms
             resetButton = new Button
             {
                 Text = "기본값 초기화",
-                Location = new Point(20, 260),
+                Location = new Point(20, 210),
                 Size = new Size(120, 35)
             };
             resetButton.Click += ResetButton_Click;
@@ -181,7 +181,7 @@ namespace AppLauncher.Presentation.WinForms
             saveButton = new Button
             {
                 Text = "저장",
-                Location = new Point(380, 260),
+                Location = new Point(380, 210),
                 Size = new Size(80, 35),
                 BackColor = Color.FromArgb(0, 120, 215),
                 ForeColor = Color.White,
@@ -195,7 +195,7 @@ namespace AppLauncher.Presentation.WinForms
             cancelButton = new Button
             {
                 Text = "취소",
-                Location = new Point(480, 260),
+                Location = new Point(480, 210),
                 Size = new Size(80, 35)
             };
             cancelButton.Click += (s, e) => this.Close();
@@ -205,8 +205,8 @@ namespace AppLauncher.Presentation.WinForms
             var versionHeaderLabel = new Label
             {
                 Text = "런처 버전:",
-                Location = new Point(20, 310),
-                Size = new Size(80, 20),
+                Location = new Point(20, 250),
+                Size = new Size(70, 20),
                 ForeColor = Color.Gray
             };
             this.Controls.Add(versionHeaderLabel);
@@ -214,17 +214,17 @@ namespace AppLauncher.Presentation.WinForms
             versionLabel = new Label
             {
                 Text = $"{VersionInfo.LAUNCHER_VERSION}",
-                Location = new Point(100, 310),
-                Size = new Size(50, 20),
+                Location = new Point(90, 250),
+                Size = new Size(100, 20),
                 ForeColor = Color.Gray
             };
             this.Controls.Add(versionLabel);
 
             var targetAppHeaderLabel = new Label
             {
-                Text = "챔버 소프트웨어 버전:",
-                Location = new Point(160, 310),
-                Size = new Size(120, 20),
+                Text = "챔버 SW 버전:",
+                Location = new Point(210, 250),
+                Size = new Size(90, 20),
                 ForeColor = Color.Gray
             };
             this.Controls.Add(targetAppHeaderLabel);
@@ -232,8 +232,8 @@ namespace AppLauncher.Presentation.WinForms
             targetAppVersionLabel = new Label
             {
                 Text = "로드 중...",
-                Location = new Point(310, 310),
-                Size = new Size(50, 20),
+                Location = new Point(300, 250),
+                Size = new Size(100, 20),
                 ForeColor = Color.Gray
             };
             this.Controls.Add(targetAppVersionLabel);
@@ -328,13 +328,49 @@ namespace AppLauncher.Presentation.WinForms
                 // 설정 저장
                 _config.TargetExecutable = targetExecutableTextBox.Text.Trim();
 
+                // 브로커 주소 변경 확인
+                string oldBroker = _config.MqttSettings?.Broker ?? "localhost";
+                string newBroker = string.IsNullOrWhiteSpace(mqttBrokerTextBox.Text) ? "localhost" : mqttBrokerTextBox.Text.Trim();
+                bool brokerChanged = oldBroker != newBroker;
+
                 // MQTT 설정 저장
-                _config.MqttSettings.Location = string.IsNullOrWhiteSpace(locationTextBox.Text) ? null : locationTextBox.Text.Trim();
-                _config.MqttSettings.Broker = string.IsNullOrWhiteSpace(mqttBrokerTextBox.Text) ? "localhost" : mqttBrokerTextBox.Text.Trim();
+                if (_config.MqttSettings != null)
+                {
+                    _config.MqttSettings.Location = string.IsNullOrWhiteSpace(locationTextBox.Text) ? null : locationTextBox.Text.Trim();
+                    _config.MqttSettings.Broker = newBroker;
+                }
 
                 ConfigManager.SaveConfig(_config);
 
-                MessageBox.Show("설정이 저장되었습니다.", "저장 완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                // MQTT 브로커 주소가 변경된 경우 서비스 재시작
+                if (brokerChanged)
+                {
+                    try
+                    {
+                        // ServiceContainer 재초기화 (새로운 브로커 주소로 연결)
+                        ServiceContainer.Dispose();
+                        ServiceContainer.Initialize(_config);
+
+                        MessageBox.Show(
+                            $"설정이 저장되었습니다.\nMQTT 브로커 주소가 변경되어 서비스를 재시작했습니다.\n새 주소: {newBroker}",
+                            "저장 완료",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(
+                            $"설정은 저장되었으나 MQTT 서비스 재시작 실패: {ex.Message}",
+                            "경고",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning);
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("설정이 저장되었습니다.", "저장 완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+
                 this.Close();
             }
             catch (Exception ex)

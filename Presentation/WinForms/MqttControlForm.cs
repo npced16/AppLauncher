@@ -37,7 +37,7 @@ namespace AppLauncher.Presentation.WinForms
         private void InitializeComponent()
         {
             this.Text = "MQTT 제어 센터";
-            this.Size = new Size(700, 600);
+            this.Size = new Size(700, 800);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -124,10 +124,11 @@ namespace AppLauncher.Presentation.WinForms
             logTextBox = new TextBox
             {
                 Location = new Point(20, 205),
-                Size = new Size(640, 280),
+                Size = new Size(640, 480),
                 Multiline = true,
                 ScrollBars = ScrollBars.Vertical,
                 ReadOnly = true,
+                BackColor = Color.White,
                 Text = "로그가 여기에 표시됩니다...",
                 Font = new Font("Consolas", 9)
             };
@@ -248,7 +249,6 @@ namespace AppLauncher.Presentation.WinForms
             {
                 var jsonObj = Newtonsoft.Json.JsonConvert.DeserializeObject(message.Payload);
                 string formattedJson = Newtonsoft.Json.JsonConvert.SerializeObject(jsonObj, Newtonsoft.Json.Formatting.Indented);
-                AddLog($"  내용 (JSON):");
                 AddLog(formattedJson);
             }
             catch
