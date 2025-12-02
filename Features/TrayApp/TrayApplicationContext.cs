@@ -19,7 +19,6 @@ namespace AppLauncher.Features.TrayApp
         private static void Log(string message) => DebugLogger.Log("TrayApp", message);
 
         private NotifyIcon? _notifyIcon;
-        private MainForm? _mainForm;
         private MqttControlForm? _mqttControlForm;
         private LauncherSettingsForm? _launcherSettingsForm;
         private LauncherConfig? _config;
@@ -214,11 +213,7 @@ namespace AppLauncher.Features.TrayApp
         {
             try
             {
-                // 모든 열려있는 폼 닫기
-                if (_mainForm != null && !_mainForm.IsDisposed)
-                {
-                    _mainForm.Close();
-                }
+
                 if (_mqttControlForm != null && !_mqttControlForm.IsDisposed)
                 {
                     _mqttControlForm.Close();

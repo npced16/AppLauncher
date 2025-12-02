@@ -44,7 +44,7 @@ namespace AppLauncher.Shared.Logger
                 await _writeLock.WaitAsync();
 
                 string fileName = GetLogFileName(category);
-                string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                string timestamp = DateTime.Now.ToString("HH:mm:ss");
                 string logEntry = $"[{timestamp}] {message}\r\n";
 
                 await File.AppendAllTextAsync(fileName, logEntry, Encoding.UTF8);

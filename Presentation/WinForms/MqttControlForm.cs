@@ -19,14 +19,20 @@ namespace AppLauncher.Presentation.WinForms
         private Label connectionStatusLabel;
         private Label brokerInfoLabel;
         private Label clientIdLabel;
-        private Label topicLabel;
         private TextBox logTextBox;
         private Button connectButton;
         private Button disconnectButton;
         private Button reconnectButton;
-        private Button settingsButton;
         private Button clearLogButton;
         private Button closeButton;
+
+        // 그룹 박스
+        private GroupBox statusGroupBox;
+        private GroupBox controlGroupBox;
+        private GroupBox logGroupBox;
+
+        // 툴팁
+        private ToolTip toolTip;
 
         public MqttControlForm()
         {
@@ -38,131 +44,234 @@ namespace AppLauncher.Presentation.WinForms
         private void InitializeComponent()
         {
             this.Text = "MQTT 제어 센터";
-            this.Size = new Size(700, 600);
+            this.Size = new Size(780, 750);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
+            this.MinimizeBox = false;
+            this.BackColor = Color.FromArgb(240, 240, 245);
 
-            // Connection Status Label
+            // 툴팁 초기화
+            toolTip = new ToolTip
+            {
+                AutoPopDelay = 5000,
+                InitialDelay = 300,
+                ReshowDelay = 100,
+                ShowAlways = true
+            };
+
+            int currentY = 20;
+
+            // ==================== 연결 상태 그룹 박스 (왼쪽) ====================
+            statusGroupBox = new GroupBox
+            {
+                Text = " 연결 정보 ",
+                Location = new Point(20, currentY),
+                Size = new Size(450, 115),
+                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(0, 51, 102)
+            };
+
+            // 연결 상태 표시
+            var statusHeaderLabel = new Label
+            {
+                Text = "상태:",
+                Location = new Point(15, 30),
+                Size = new Size(60, 25),
+                Font = new Font("Segoe UI", 9),
+                ForeColor = Color.FromArgb(50, 50, 50),
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            statusGroupBox.Controls.Add(statusHeaderLabel);
+
             connectionStatusLabel = new Label
             {
-                Text = "연결 안됨",
-                Location = new Point(20, 20),
+                Text = "● 연결 안됨",
+                Location = new Point(80, 30),
                 Size = new Size(150, 25),
-                Font = new Font(Font.FontFamily, 10, FontStyle.Bold),
-                ForeColor = Color.Red
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                ForeColor = Color.FromArgb(220, 53, 69),
+                TextAlign = ContentAlignment.MiddleLeft
             };
-            this.Controls.Add(connectionStatusLabel);
+            statusGroupBox.Controls.Add(connectionStatusLabel);
 
-            // Broker Info Label
+            // 브로커 정보
+            var brokerHeaderLabel = new Label
+            {
+                Text = "브로커:",
+                Location = new Point(15, 63),
+                Size = new Size(60, 20),
+                Font = new Font("Segoe UI", 9),
+                ForeColor = Color.FromArgb(50, 50, 50)
+            };
+            statusGroupBox.Controls.Add(brokerHeaderLabel);
+
             brokerInfoLabel = new Label
             {
-                Text = "브로커: ",
-                Location = new Point(20, 50),
-                Size = new Size(400, 20)
+                Text = "로드 중...",
+                Location = new Point(80, 63),
+                Size = new Size(350, 20),
+                Font = new Font("Segoe UI", 9),
+                ForeColor = Color.FromArgb(0, 120, 215)
             };
-            this.Controls.Add(brokerInfoLabel);
+            statusGroupBox.Controls.Add(brokerInfoLabel);
 
-            // Client ID Label
+            // 클라이언트 ID
+            var clientIdHeaderLabel = new Label
+            {
+                Text = "ID:",
+                Location = new Point(15, 88),
+                Size = new Size(60, 22),
+                Font = new Font("Segoe UI", 9.5f),
+                ForeColor = Color.FromArgb(50, 50, 50)
+            };
+            statusGroupBox.Controls.Add(clientIdHeaderLabel);
+
             clientIdLabel = new Label
             {
-                Text = "클라이언트 ID: ",
-                Location = new Point(20, 75),
-                Size = new Size(400, 20)
+                Text = "로드 중...",
+                Location = new Point(80, 88),
+                Size = new Size(350, 22),
+                Font = new Font("Consolas", 9.5f),
+                ForeColor = Color.FromArgb(100, 100, 100),
+                AutoEllipsis = true
             };
-            this.Controls.Add(clientIdLabel);
+            statusGroupBox.Controls.Add(clientIdLabel);
 
-            // Topic Label
-            topicLabel = new Label
+            this.Controls.Add(statusGroupBox);
+
+            // ==================== 제어 버튼 그룹 박스 (오른쪽) ====================
+            controlGroupBox = new GroupBox
             {
-                Text = "구독 토픽: ",
-                Location = new Point(20, 100),
-                Size = new Size(400, 20)
+                Text = " 연결 제어 ",
+                Location = new Point(480, currentY),
+                Size = new Size(260, 115),
+                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(0, 51, 102)
             };
-            this.Controls.Add(topicLabel);
 
-            // Connect Button
+            // 연결 버튼
             connectButton = new Button
             {
                 Text = "연결",
-                Location = new Point(20, 130),
-                Size = new Size(100, 35)
+                Location = new Point(15, 25),
+                Size = new Size(230, 25),
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                BackColor = Color.FromArgb(40, 167, 69),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
             };
+            connectButton.FlatAppearance.BorderSize = 0;
+            connectButton.FlatAppearance.MouseOverBackColor = Color.FromArgb(33, 136, 56);
             connectButton.Click += ConnectButton_Click;
-            this.Controls.Add(connectButton);
+            toolTip.SetToolTip(connectButton, "MQTT 브로커에 연결합니다");
+            controlGroupBox.Controls.Add(connectButton);
 
-            // Disconnect Button
+            // 연결 해제 버튼
             disconnectButton = new Button
             {
                 Text = "연결 해제",
-                Location = new Point(130, 130),
-                Size = new Size(100, 35),
+                Location = new Point(15, 55),
+                Size = new Size(230, 25),
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                BackColor = Color.FromArgb(220, 53, 69),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand,
                 Enabled = false
             };
+            disconnectButton.FlatAppearance.BorderSize = 0;
+            disconnectButton.FlatAppearance.MouseOverBackColor = Color.FromArgb(200, 35, 51);
             disconnectButton.Click += DisconnectButton_Click;
-            this.Controls.Add(disconnectButton);
+            toolTip.SetToolTip(disconnectButton, "MQTT 연결을 해제합니다");
+            controlGroupBox.Controls.Add(disconnectButton);
 
-            // Reconnect Button
+            // 재연결 버튼
             reconnectButton = new Button
             {
                 Text = "재연결",
-                Location = new Point(240, 130),
-                Size = new Size(100, 35)
+                Location = new Point(15, 85),
+                Size = new Size(230, 25),
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                BackColor = Color.FromArgb(0, 120, 215),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
             };
+            reconnectButton.FlatAppearance.BorderSize = 0;
+            reconnectButton.FlatAppearance.MouseOverBackColor = Color.FromArgb(0, 100, 195);
             reconnectButton.Click += ReconnectButton_Click;
-            this.Controls.Add(reconnectButton);
+            toolTip.SetToolTip(reconnectButton, "MQTT 연결을 다시 시도합니다");
+            controlGroupBox.Controls.Add(reconnectButton);
 
-            // Settings Button
-            settingsButton = new Button
+            this.Controls.Add(controlGroupBox);
+            currentY += 130;
+
+            // ==================== 로그 그룹 박스 ====================
+            logGroupBox = new GroupBox
             {
-                Text = "설정",
-                Location = new Point(350, 130),
-                Size = new Size(100, 35)
+                Text = " 실시간 로그 ",
+                Location = new Point(20, currentY),
+                Size = new Size(720, 515),
+                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(0, 51, 102)
             };
-            settingsButton.Click += SettingsButton_Click;
-            this.Controls.Add(settingsButton);
 
-            // Log Label
-            var logLabel = new Label
-            {
-                Text = "로그:",
-                Location = new Point(20, 180),
-                Size = new Size(100, 20)
-            };
-            this.Controls.Add(logLabel);
-
-            // Log TextBox
+            // 로그 텍스트박스
             logTextBox = new TextBox
             {
-                Location = new Point(20, 205),
-                Size = new Size(640, 280),
+                Location = new Point(15, 28),
+                Size = new Size(690, 430),
                 Multiline = true,
                 ScrollBars = ScrollBars.Vertical,
                 ReadOnly = true,
+                BackColor = Color.FromArgb(30, 30, 30),
+                ForeColor = Color.FromArgb(220, 220, 220),
                 Text = "로그가 여기에 표시됩니다...",
-                Font = new Font("Consolas", 9)
+                Font = new Font("Consolas", 9.5f),
+                BorderStyle = BorderStyle.FixedSingle
             };
-            this.Controls.Add(logTextBox);
+            toolTip.SetToolTip(logTextBox, "MQTT 메시지 및 이벤트 로그");
+            logGroupBox.Controls.Add(logTextBox);
 
-            // Clear Log Button
+            // 로그 지우기 버튼
             clearLogButton = new Button
             {
-                Text = "로그 지우기",
-                Location = new Point(460, 495),
-                Size = new Size(100, 35)
+                Text = "🗑️ 로그 지우기",
+                Location = new Point(15, 468),
+                Size = new Size(125, 35),
+                Font = new Font("Segoe UI", 9),
+                BackColor = Color.FromArgb(108, 117, 125),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
             };
+            clearLogButton.FlatAppearance.BorderSize = 0;
+            clearLogButton.FlatAppearance.MouseOverBackColor = Color.FromArgb(90, 98, 104);
             clearLogButton.Click += (s, e) => logTextBox.Text = "로그가 여기에 표시됩니다...";
-            this.Controls.Add(clearLogButton);
+            toolTip.SetToolTip(clearLogButton, "화면의 로그를 지웁니다");
+            logGroupBox.Controls.Add(clearLogButton);
 
-            // Close Button
+            // 닫기 버튼
             closeButton = new Button
             {
-                Text = "닫기",
-                Location = new Point(570, 495),
-                Size = new Size(90, 35)
+                Text = "✖️ 닫기",
+                Location = new Point(600, 468),
+                Size = new Size(105, 35),
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                BackColor = Color.FromArgb(108, 117, 125),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
             };
+            closeButton.FlatAppearance.BorderSize = 0;
+            closeButton.FlatAppearance.MouseOverBackColor = Color.FromArgb(90, 98, 104);
             closeButton.Click += (s, e) => this.Close();
-            this.Controls.Add(closeButton);
+            toolTip.SetToolTip(closeButton, "제어 센터를 닫습니다 (연결은 유지됨)");
+            logGroupBox.Controls.Add(closeButton);
+
+            this.Controls.Add(logGroupBox);
         }
 
         private void LoadSettings()
@@ -172,10 +281,9 @@ namespace AppLauncher.Presentation.WinForms
                 var config = ConfigManager.LoadConfig();
                 _settings = config.MqttSettings;
 
-                brokerInfoLabel.Text = $"브로커: {_settings.Broker}:{_settings.Port}";
+                brokerInfoLabel.Text = $"{_settings.Broker}:{_settings.Port}";
                 string clientId = _mqttService.ClientId;
-                clientIdLabel.Text = $"클라이언트 ID: {clientId}";
-                topicLabel.Text = $"구독 토픽: device/{clientId}/commands";
+                clientIdLabel.Text = $"{clientId}";
 
                 // 전역 MQTT 서비스에 연결
                 AttachToExistingService();
@@ -222,15 +330,15 @@ namespace AppLauncher.Presentation.WinForms
             {
                 if (isConnected)
                 {
-                    connectionStatusLabel.Text = "연결됨";
-                    connectionStatusLabel.ForeColor = Color.Green;
+                    connectionStatusLabel.Text = "● 연결됨";
+                    connectionStatusLabel.ForeColor = Color.FromArgb(40, 167, 69);
                     connectButton.Enabled = false;
                     disconnectButton.Enabled = true;
                 }
                 else
                 {
-                    connectionStatusLabel.Text = "연결 안됨";
-                    connectionStatusLabel.ForeColor = Color.Red;
+                    connectionStatusLabel.Text = "● 연결 안됨";
+                    connectionStatusLabel.ForeColor = Color.FromArgb(220, 53, 69);
                     connectButton.Enabled = true;
                     disconnectButton.Enabled = false;
                 }
@@ -259,7 +367,6 @@ namespace AppLauncher.Presentation.WinForms
             {
                 var jsonObj = Newtonsoft.Json.JsonConvert.DeserializeObject(message.Payload);
                 string formattedJson = Newtonsoft.Json.JsonConvert.SerializeObject(jsonObj, Newtonsoft.Json.Formatting.Indented);
-                AddLog($"  내용 (JSON):");
                 AddLog(formattedJson);
             }
             catch
@@ -345,10 +452,7 @@ namespace AppLauncher.Presentation.WinForms
             {
                 AddLog($"❌ 연결 해제 오류: {ex.Message}");
             }
-            finally
-            {
-                disconnectButton.Enabled = true;
-            }
+
         }
 
         private async void ReconnectButton_Click(object? sender, EventArgs e)
@@ -377,32 +481,6 @@ namespace AppLauncher.Presentation.WinForms
             finally
             {
                 reconnectButton.Enabled = true;
-            }
-        }
-
-        private void SettingsButton_Click(object? sender, EventArgs e)
-        {
-            try
-            {
-                var settingsForm = new MqttSettingsForm();
-                settingsForm.ShowDialog(this);
-
-                // 설정이 변경되었을 수 있으므로 다시 로드
-                var config = ConfigManager.LoadConfig();
-                _settings = config.MqttSettings;
-
-                if (_settings != null)
-                {
-                    brokerInfoLabel.Text = $"브로커: {_settings.Broker}:{_settings.Port}";
-                    string clientId = _mqttService?.ClientId ?? HardwareInfo.GetHardwareUuid();
-                    clientIdLabel.Text = $"클라이언트 ID: {clientId}";
-                    topicLabel.Text = $"구독 토픽: device/{clientId}/commands";
-                    AddLog("설정이 업데이트되었습니다. 재연결이 필요할 수 있습니다.");
-                }
-            }
-            catch (Exception ex)
-            {
-                AddLog($"❌ 설정 창 오류: {ex.Message}");
             }
         }
 

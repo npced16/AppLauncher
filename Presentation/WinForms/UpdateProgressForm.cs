@@ -229,26 +229,12 @@ namespace AppLauncher.Presentation.WinForms
                 if (_updateSuccess)
                 {
                     // 업데이트 성공 시 컴퓨터 재시작
-                    if (InvokeRequired)
-                    {
-                        Invoke(new Action(() => RestartComputer()));
-                    }
-                    else
-                    {
-                        RestartComputer();
-                    }
+                    RestartComputer();
                 }
                 else
                 {
                     // 업데이트 실패 시 기존 프로그램 실행
-                    if (InvokeRequired)
-                    {
-                        Invoke(new Action(() => StartExistingApp()));
-                    }
-                    else
-                    {
-                        StartExistingApp();
-                    }
+                    StartExistingApp();
                 }
             }
         }
@@ -337,8 +323,37 @@ namespace AppLauncher.Presentation.WinForms
 
         private void UpdateStatus(string status)
         {
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(() => UpdateStatus(status)));
+                return;
+            }
+
             statusLabel.Text = status;
-            detailLabel.Text = $"업데이트 정보:\n버전: {_command.Version}\n시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+
+            // 현재 챔버 소프트웨어 버전 가져오기
+            string currentVersion = GetCurrentVersion();
+            string targetAppVersionInfo = string.IsNullOrEmpty(currentVersion)
+                ? $"{_command.Version}"
+                : $"{currentVersion} → {_command.Version}";
+
+            detailLabel.Text = $"업데이트 정보:\n런처 버전: {VersionInfo.LAUNCHER_VERSION}\n챔버 소프트웨어 버전: {targetAppVersionInfo}\n시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+        }
+
+        private string GetCurrentVersion()
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(_config.LocalVersionFile) && System.IO.File.Exists(_config.LocalVersionFile))
+                {
+                    return System.IO.File.ReadAllText(_config.LocalVersionFile).Trim();
+                }
+            }
+            catch
+            {
+                // 버전 파일 읽기 실패 시 빈 문자열 반환
+            }
+            return "";
         }
 
         private void UpdateInstallStatus(string status)

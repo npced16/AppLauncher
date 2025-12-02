@@ -122,7 +122,7 @@ namespace AppLauncher.Shared.Configuration
         /// MQTT 브로커 주소
         /// </summary>
         [JsonProperty("broker")]
-        public string Broker { get; set; } = "localhost";
+        public string Broker { get; set; } = "";
 
         /// <summary>
         /// MQTT 브로커 포트 (기본: 1883)
